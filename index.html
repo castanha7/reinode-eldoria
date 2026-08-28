@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>Reino de Eldoria — RPG 2D Pixel Art</title>
+<meta name="description" content="RPG 2D top-down em pixel art: explore o reino de Eldoria, lute, evolua e enfrente o Guardião das Profundezas." />
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<canvas id="game" tabindex="0"></canvas>
+
+<div id="ui">
+  <div id="toasts"></div>
+  <div id="loot-card" class="hidden"></div>
+
+  <!-- diálogo -->
+  <div id="dialog" class="hidden"></div>
+
+  <!-- inventário -->
+  <div id="inventory" class="panel hidden">
+    <div class="panel-head">
+      <h2>Inventário</h2>
+      <button class="btn ghost" data-act="close">Fechar (I)</button>
+    </div>
+    <div class="panel-cols">
+      <div class="col">
+        <h3>Equipamento</h3>
+        <div id="equip-slots"></div>
+        <h3>Atributos</h3>
+        <div id="stat-list" class="stats"></div>
+      </div>
+      <div class="col">
+        <h3>Mochila <span class="muted" id="bag-count"></span></h3>
+        <div id="bag-grid"></div>
+        <div id="bag-actions"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- loja / curandeira / ferreiro -->
+  <div id="shop" class="panel wide hidden">
+    <div class="panel-head">
+      <h2 id="shop-title">Loja</h2>
+      <span id="shop-gold" class="gold"></span>
+      <button class="btn ghost" data-act="close">Fechar</button>
+    </div>
+    <div id="shop-body" class="scroll"></div>
+  </div>
+
+  <!-- missões -->
+  <div id="quests" class="panel hidden">
+    <div class="panel-head">
+      <h2>Diário de Missões</h2>
+      <button class="btn ghost" data-act="close">Fechar (Q)</button>
+    </div>
+    <div id="quest-list" class="scroll"></div>
+  </div>
+
+  <!-- ajuda -->
+  <div id="help" class="panel hidden">
+    <div class="panel-head">
+      <h2>Ajuda</h2>
+      <button class="btn ghost" data-act="close">Fechar</button>
+    </div>
+    <div id="help-body" class="scroll"></div>
+  </div>
+
+  <!-- pausa -->
+  <div id="pause" class="panel narrow hidden">
+    <h2 class="center">Pausado</h2>
+    <div class="vstack">
+      <button class="btn" data-act="resume">Continuar</button>
+      <button class="btn" data-act="tab-inv">Inventário</button>
+      <button class="btn" data-act="tab-quests">Missões</button>
+      <button class="btn" data-act="tab-help">Ajuda</button>
+      <button class="btn danger" data-act="restart">Abandonar partida</button>
+    </div>
+  </div>
+
+  <!-- morte -->
+  <div id="death" class="overlay hidden">
+    <div class="death-box">
+      <h2>Você caiu em batalha</h2>
+      <div id="death-stats"></div>
+      <button class="btn big" data-act="respawn">Acordar na cidade</button>
+    </div>
+  </div>
+
+  <!-- título -->
+  <div id="title" class="overlay">
+    <div class="title-inner">
+      <div class="crest"></div>
+      <h1>REINO DE <span>ELDORIA</span></h1>
+      <p class="subtitle">Um RPG 2D em pixel art — escolha sua classe</p>
+      <div id="class-list"></div>
+      <div class="title-actions">
+        <button id="btn-start" class="btn big disabled" data-act="start">Começar aventura</button>
+        <button id="btn-continue" class="btn ghost hidden" data-act="continue">Continuar jogo salvo</button>
+        <button id="btn-wipe" class="btn tiny ghost">Apagar progresso</button>
+      </div>
+      <p class="hint">WASD move · Mouse mira e ataca · 1/2/3 habilidades · E interage · I inventário · Q missões</p>
+    </div>
+  </div>
+</div>
+
+<script type="module" src="src/main.js"></script>
+</body>
+</html>
