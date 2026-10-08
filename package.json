@@ -1,0 +1,13 @@
+{
+  "name": "reino-de-eldoria",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "RPG 2D top-down em pixel art medieval/fantasia: exploração, combate em tempo real, 4 classes, evolução, loot e chefe.",
+  "scripts": {
+    "start": "python3 -m http.server 8080 --bind 0.0.0.0",
+    "test": "node tests/run.mjs",
+    "shots": "node tests/shots.mjs"
+  },
+  "license": "MIT"
+}
