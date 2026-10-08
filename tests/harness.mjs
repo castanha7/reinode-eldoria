@@ -43,6 +43,8 @@ class FakeCtx {
   closePath() {}
   moveTo() {}
   lineTo() {}
+  quadraticCurveTo() {}
+  bezierCurveTo() {}
   arcTo() {}
   arc() {}
   ellipse() {}

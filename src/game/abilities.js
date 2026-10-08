@@ -224,14 +224,171 @@ export function castSkill(game, p, index, sk) {
       break;
     }
 
+    // raio que salta entre inimigos próximos (dano decrescente por salto)
+    case 'chain': {
+      sfx(P.sound);
+      game.addFx(new ChainFx(p, game, P, dmg));
+      break;
+    }
+
+    // postura defensiva: reduz o próximo dano recebido e reflete o corpo a corpo
+    case 'vow': {
+      sfx(P.sound);
+      p.vowT = P.duration; // duração fixa (buffs de status não escalan com cdRed)
+      p.vowReduce = P.reduction;
+      p.vowReflect = P.reflect;
+      game.addFx(new NovaFx(p.x, p.y - 8, 46, ['#ffd85a', '#fff2c0'], 0.5));
+      game.addEffect({ sprite: 'fx:ring', frames: 5, x: p.x, y: p.y - 8, life: 0.5, scale: 1.6 });
+      game.notify('Juramento de Ferro: dano sofrido reduzido, golpes refletidos!', '#ffd85a');
+      break;
+    }
+
+    // tiro pesado de alta precisão: fura, dói e marca o alvo
+    case 'marked_shot': {
+      sfx(P.sound);
+      game.spawnProjectile({
+        x: p.x + Math.cos(p.aimAngle) * 10,
+        y: p.y - 10 + Math.sin(p.aimAngle) * 10,
+        angle: p.aimAngle,
+        speed: P.speed,
+        dmg,
+        from: p,
+        sprite: P.sprite,
+        size: P.size,
+        pierce: P.pierce || 0,
+        life: 2.2,
+        trail: '#ffe066',
+        crit: Math.random() < p.stats.crit + 0.15,
+        critDmg: p.stats.critDmg,
+        lifesteal: p.stats.lifesteal,
+        mark: P.markAmt, markTime: P.markTime,
+      });
+      game.camera.kick(2.2, 0.16);
+      p.swing = 0.24;
+      break;
+    }
+
+    // salto sobre o inimigo mais ferido por perto + dano de execução
+    case 'execute': {
+      const tgt = weakestEnemyNear(game, p, P.range);
+      if (!tgt) break; // o custo é devolvido antes em Player.cast (ver hasExecuteTarget)
+      sfx(P.sound);
+      const a = Math.atan2(tgt.y - p.y, tgt.x - p.x);
+      const d = Math.min(70, Math.hypot(tgt.x - p.x, tgt.y - p.y));
+      const nx = p.x + Math.cos(a) * Math.max(0, d - 20);
+      const ny = p.y + Math.sin(a) * Math.max(0, d - 20);
+      game.particles.burst(p.x, p.y - 8, 12, { color: ['#2b1030', '#b02a3a'], speed: 70, life: 0.35 });
+      p.x = nx; p.y = ny;
+      p.aimAngle = a;
+      const missing = 1 - tgt.hp / tgt.maxHp;
+      const exDmg = dmg * (1 + P.missingBonus * missing);
+      game.addEffect({ sprite: 'fx:slashred', frames: 3, x: tgt.x, y: tgt.y - 8, rot: a + Math.PI, life: 0.2, scale: 1.5 });
+      game.hitEnemy(tgt, exDmg, {
+        from: p, crit: true, critDmg: p.stats.critDmg, knock: 130, angle: a, lifesteal: p.stats.lifesteal,
+      });
+      game.particles.burst(tgt.x, tgt.y - 8, 18, { color: ['#b02a3a', '#ff6a8a', '#ffffff'], speed: 130, life: 0.5 });
+      game.camera.kick(3, 0.22);
+      p.swing = 0.22;
+      break;
+    }
+
     default:
       break;
   }
 }
 
+/** Inimigo vivo mais ferido dentro do alcance. */
+export function weakestEnemyNear(game, p, range) {
+  let best = null, bestFrac = 1.001;
+  for (const e of game.enemies) {
+    if (e.dead || e.spawnT > 0 || e.untargetable) continue;
+    if (Math.hypot(e.x - p.x, e.y - p.y) > range) continue;
+    const frac = e.hp / e.maxHp;
+    if (frac < bestFrac) { bestFrac = frac; best = e; }
+  }
+  return best;
+}
+
+/** Existe alvo de execução disponível? (checado antes de gastar mana/cooldown) */
+export function hasExecuteTarget(game, p, range) {
+  return !!weakestEnemyNear(game, p, range);
+}
+
 // ---------------------------------------------------------------------------
 // Efeitos de habilidade com lógica própria
 // ---------------------------------------------------------------------------
+
+/** Raio arcano que salta de inimigo em inimigo, pulsando a cada salto. */
+class ChainFx {
+  constructor(p, game, P, dmg) {
+    this.p = p;
+    this.P = P;
+    this.dmg = dmg;
+    this.hits = new Set();
+    this.bolts = [];
+    let srcX = p.x, srcY = p.y - 8;
+    let power = dmg;
+    // primeiro alvo: o mais próximo da mira
+    let first = null, fd = 1e9;
+    const mw = game.mouseWorld || { x: p.x, y: p.y };
+    for (const e of game.enemies) {
+      if (e.dead || e.spawnT > 0 || e.untargetable) continue;
+      const d = Math.hypot(e.x - mw.x, e.y - mw.y);
+      if (d < 130 && d < fd) { fd = d; first = e; }
+    }
+    if (!first) first = game.nearestEnemy(p.x, p.y, P.jumpRange + 60);
+    for (let j = 0; j < P.jumps && first; j++) {
+      this.hits.add(first.uid);
+      this.bolts.push({ x0: srcX, y0: srcY, x1: first.x, y1: first.y - 8 });
+      game.hitEnemy(first, power, {
+        from: p, crit: Math.random() < p.stats.crit, critDmg: p.stats.critDmg,
+        knock: 30, angle: Math.atan2(first.y - srcY, first.x - srcX), lifesteal: p.stats.lifesteal,
+      });
+      game.particles.burst(first.x, first.y - 8, 8, { color: ['#b8a0ff', '#ffffff', '#7ad6ff'], speed: 90, life: 0.35 });
+      game.sfx('hit');
+      power *= 1 - (P.decay || 0);
+      srcX = first.x; srcY = first.y - 8;
+      // próximo salto: inimigo vivo mais próximo do último atingido
+      let nx = null, nd = P.jumpRange;
+      for (const e of game.enemies) {
+        if (e.dead || e.spawnT > 0 || e.untargetable || this.hits.has(e.uid)) continue;
+        const d = Math.hypot(e.x - srcX, e.y - srcY);
+        if (d < nd) { nd = d; nx = e; }
+      }
+      first = nx;
+    }
+    if (!this.bolts.length) {
+      game.notify('A Cadeia Arcana não encontrou alvos.', '#9a9ab0');
+    }
+    this.life = 0.3; this.max = 0.3;
+  }
+  update(dt) { this.life -= dt; return this.life > 0; }
+  draw(ctx) {
+    const t = this.life / this.max;
+    ctx.save();
+    ctx.globalAlpha = t;
+    ctx.strokeStyle = '#7ad6ff';
+    ctx.lineWidth = 3;
+    for (const b of this.bolts) {
+      // raio em zigue-zague
+      const segs = 5;
+      ctx.beginPath();
+      ctx.moveTo(b.x0, b.y0);
+      for (let i = 1; i < segs; i++) {
+        const f = i / segs;
+        const jx = (Math.random() * 2 - 1) * 5, jy = (Math.random() * 2 - 1) * 5;
+        ctx.lineTo(b.x0 + (b.x1 - b.x0) * f + jx, b.y0 + (b.y1 - b.y0) * f + jy);
+      }
+      ctx.lineTo(b.x1, b.y1);
+      ctx.stroke();
+    }
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 1.2;
+    for (const b of this.bolts) { ctx.beginPath(); ctx.moveTo(b.x0, b.y0); ctx.lineTo(b.x1, b.y1); ctx.stroke(); }
+    ctx.restore();
+  }
+}
+
 class BeamFx {
   constructor(x, y, ang, len, width, color) {
     this.x = x; this.y = y; this.ang = ang; this.len = len; this.width = width;

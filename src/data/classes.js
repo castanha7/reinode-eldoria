@@ -16,6 +16,10 @@
  *  warcry       — onda de choque que atordoa + buff de ataque/defesa + cura
  *  fan          — leque de flechas em arco
  *  smoke        — bomba de fumaça: cega inimigos e dá esquiva
+ *  chain        — raio que salta entre vários inimigos (dano decrescente)
+ *  vow          — juramento defensivo: reduz dano recebido e reflete parte
+ *  marked_shot  — tiro pesado lento que marca o alvo (+dano recebido)
+ *  execute      — salta sobre o inimigo mais fraco; dano extra por vida falta
  */
 
 export const CLASSES = {
@@ -53,6 +57,11 @@ export const CLASSES = {
         id: 'meteor_storm', name: 'Chuva de Meteoros', kind: 'meteor', level: 5, cost: 40, cd: 15,
         desc: 'Invoca 7 meteoros flamejantes sobre a área mirada. Devastador contra grupos.',
         params: { dmgMul: 2.2, radius: 92, count: 7, duration: 1.8, blast: 36, sound: 'fire', scale: 0.12 },
+      },
+      {
+        id: 'arcane_chain', name: 'Cadeia Arcana', kind: 'chain', level: 8, cost: 20, cd: 6.5,
+        desc: 'Um raio que salta entre até 5 inimigos próximos, perdendo 15% de força a cada salto.',
+        params: { dmgMul: 1.45, jumps: 5, jumpRange: 120, decay: 0.15, sound: 'shoot', scale: 0.10 },
       },
     ],
   },
@@ -92,6 +101,11 @@ export const CLASSES = {
         desc: 'Atordoa inimigos próximos, cura 18% da vida e ganha +30% dano e +40% defesa por 8s.',
         params: { dmgMul: 1.2, radius: 105, stun: 1.4, heal: 0.18, atkBuff: 0.3, defBuff: 0.4, buffTime: 8, sound: 'boss', scale: 0.10 },
       },
+      {
+        id: 'iron_vow', name: 'Juramento de Ferro', kind: 'vow', level: 8, cost: 22, cd: 16,
+        desc: 'Postura defensiva por 6s: sofre 40% menos dano e reflete 30% do dano corpo a corpo recebido.',
+        params: { duration: 6, reduction: 0.4, reflect: 0.3, sound: 'ice', scale: 0.06 },
+      },
     ],
   },
 
@@ -130,6 +144,11 @@ export const CLASSES = {
         desc: 'Dispara de uma só vez um leque de 9 flechas perfurantes.',
         params: { dmgMul: 1.05, count: 9, spread: 1.15, speed: 520, size: 10, pierce: 1, sprite: 'fx:arrow', sound: 'shoot', scale: 0.10 },
       },
+      {
+        id: 'eagle_mark', name: 'Tiro do Olho de Falcão', kind: 'marked_shot', level: 8, cost: 20, cd: 8,
+        desc: 'Tiro pesado e lento que perfura armaduras e marca o alvo: +20% de dano contra ele por 8s.',
+        params: { dmgMul: 3.4, speed: 700, size: 13, sprite: 'fx:arrow', markAmt: 0.2, markTime: 8, pierce: 1, sound: 'crit', scale: 0.10 },
+      },
     ],
   },
 
@@ -167,6 +186,11 @@ export const CLASSES = {
         id: 'smoke_bomb', name: 'Bomba de Fumaça', kind: 'smoke', level: 5, cost: 24, cd: 14,
         desc: 'Cega inimigos ao redor e te dá +40% esquiva e +25% velocidade por 5s.',
         params: { dmgMul: 1.1, radius: 84, stun: 1.6, dodge: 0.4, speedBuff: 0.25, buffTime: 5, sound: 'ice', scale: 0.10 },
+      },
+      {
+        id: 'death_mark', name: 'Execução', kind: 'execute', level: 8, cost: 24, cd: 12,
+        desc: 'Salta sobre o inimigo mais ferido por perto e o ataca com brutalidade: +40% de dano conforme a vida que falta ao alvo.',
+        params: { dmgMul: 2.4, range: 240, missingBonus: 0.4, sound: 'dash', scale: 0.12 },
       },
     ],
   },

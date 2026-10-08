@@ -21,8 +21,8 @@ export const MODES = {
   },
   hardcore: {
     id: 'hardcore', name: 'Hardcore', icon: '☠',
-    lives: 1, hp: 1.4, dmg: 1.35, regen: 0.5, reward: 1.25, color: '#ff6a6a',
-    desc: 'Uma única chance. Inimigos muito mais fortes, pouca regeneração e morte definitiva — o save é apagado. Sem Pena da Fênix.',
+    lives: 1, hp: 1.25, dmg: 1.2, regen: 0.6, reward: 1.2, color: '#ff6a6a',
+    desc: 'Uma única chance. Inimigos um passo acima — mais resistentes, mais fortes e regeneração reduzida. Morte definitiva: o save é apagado. Sem Pena da Fênix.',
   },
 };
 

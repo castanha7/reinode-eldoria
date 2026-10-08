@@ -26,7 +26,9 @@ export class Projectile {
     this.critDmg = o.critDmg || 1.8;
     this.lifesteal = o.lifesteal || 0;
     this.trail = o.trail || null;
-    this.hitOpts = o.hitOpts || null; // efeitos extras ao acertar o jogador (slow, etc.)
+    this.hitOpts = o.hitOpts || null; // efeitos extras ao acertar o jogador (slow, dot, etc.)
+    this.mark = o.mark || 0;         // Olho de Falcão: +dano recebido pelo alvo
+    this.markTime = o.markTime || 0;
     this.dead = false;
     this.hits = new Set();
     this.t = 0;
@@ -63,9 +65,10 @@ export class Projectile {
       }
     } else {
       for (const e of game.enemies) {
-        if (e.dead || this.hits.has(e.uid)) continue;
+        if (e.dead || e.untargetable || this.hits.has(e.uid)) continue; // atravessa quem está soterrado
         if (Math.hypot(e.x - this.x, (e.y - e.radius * 0.6) - this.y) < e.radius + this.size * 0.5) {
           this.hits.add(e.uid);
+          if (this.mark) e.applyMark(this.mark, this.markTime || 8);
           game.hitEnemy(e, this.dmg, {
             from: this.from, crit: this.crit, critDmg: this.critDmg,
             knock: 90, angle: this.angle, lifesteal: this.lifesteal,

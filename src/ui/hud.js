@@ -160,9 +160,10 @@ export function drawHud(ctx, game) {
     ctx.fillText(M.name.toUpperCase(), px, py + 50);
     ctx.font = 'bold 12px "Courier New", monospace';
     const n = Math.max(p.maxLives, p.lives);
+    const glyph = game.mode === 'hardcore' ? '☠' : '♥';
     for (let i = 0; i < n; i++) {
-      ctx.fillStyle = i < p.lives ? '#ff4a6a' : 'rgba(120,100,140,0.45)';
-      ctx.fillText('♥', px + i * 12, py + 66);
+      ctx.fillStyle = i < p.lives ? (game.mode === 'hardcore' ? '#ff6a6a' : '#ff4a6a') : 'rgba(120,100,140,0.45)';
+      ctx.fillText(glyph, px + i * 12, py + 66);
     }
   }
 
@@ -264,6 +265,24 @@ export function drawHud(ctx, game) {
     ctx.textAlign = 'left';
     bxp += 38;
   }
+  // --- estados: veneno/queimadura e juramento (v2.1) -------------------------
+  const statusChip = (glyph, color, txt) => {
+    ctx.fillStyle = 'rgba(14,12,30,0.86)';
+    roundRect(ctx, bxp, byp, 34, 18, 4);
+    ctx.fill();
+    ctx.strokeStyle = color;
+    ctx.globalAlpha = 0.75;
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = color;
+    ctx.font = 'bold 10px "Courier New", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(glyph + (txt ? ' ' + txt : ''), bxp + 17, byp + 13);
+    ctx.textAlign = 'left';
+    bxp += 38;
+  };
+  if (p.dotT > 0) statusChip('☣', p.dotColor || '#8aff8a', Math.ceil(p.dotT) + 's');
+  if (p.vowT > 0) statusChip('⛨', '#ffd85a', Math.ceil(p.vowT) + 's');
 
   // ---- minimapa ------------------------------------------------------------
   drawMinimap(ctx, game, W - 152, 12, 140, Math.round(140 * (game.map.h / game.map.w)));
@@ -277,7 +296,7 @@ export function drawHud(ctx, game) {
     ctx.fill();
     ctx.strokeStyle = 'rgba(184,117,240,0.6)';
     ctx.stroke();
-    const bcol = { spider: '#c04ae0', lich: '#3ad8c0', titan: '#ff8a2a' }[game.boss.bossKind] || '#b875f0';
+    const bcol = { spider: '#c04ae0', lich: '#3ad8c0', titan: '#ff8a2a', frost: '#6ad8ff', ember: '#ff6a2a' }[game.boss.bossKind] || '#b875f0';
     ctx.font = 'bold 12px "Courier New", monospace';
     ctx.textAlign = 'center';
     ctx.fillStyle = '#e0c8ff';

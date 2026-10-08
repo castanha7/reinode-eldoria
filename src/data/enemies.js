@@ -114,6 +114,56 @@ export const ENEMIES = {
     attack: { range: 36, cd: 2.2, windup: 0.8, knock: 220 }, drops: [{ id: 'elixir_guard', chance: 0.12 }, { id: 'potion_hp_big', chance: 0.15 }],
     blurb: 'Pesado e quase imune a golpes leves. Bata forte.',
   },
+  // ---- novos comportamentos (v2.1) ---------------------------------------
+  imp: {
+    id: 'imp', name: 'Diabrete Saltador', hp: 40, dmg: 11, def: 1, speed: 126, xp: 26, gold: [5, 12],
+    radius: 7, sprite: 'imp', frames: 4, ai: 'hitrun', tier: 2, color: '#e05a3a',
+    attack: { range: 16, cd: 1.7, windup: 0.22, dot: { t: 2.6, dps: 2.2 } },
+    drops: [{ id: 'ration', chance: 0.08 }],
+    blurb: 'Rápido e frágil: bate, ri e foge para voltar daqui a pouco. Queima.',
+  },
+  plague_rat: {
+    id: 'plague_rat', name: 'Rato da Peste', hp: 36, dmg: 9, def: 1, speed: 94, xp: 20, gold: [4, 10],
+    radius: 7, sprite: 'plague_rat', frames: 4, ai: 'chaser', tier: 1, color: '#7a8a4a', flee: true,
+    attack: { range: 14, cd: 1.1, windup: 0.3, dot: { t: 4, dps: 2 } },
+    drops: [{ id: 'ration', chance: 0.12 }],
+    blurb: 'A mordida envenena aos poucos. Ferido, foge — encurralado, morde mais forte.',
+  },
+  shaman: {
+    id: 'shaman', name: 'Xamã Tribal', hp: 86, dmg: 14, def: 3, speed: 70, xp: 56, gold: [16, 30],
+    radius: 8, sprite: 'shaman', frames: 4, ai: 'supporter', tier: 3, color: '#3aa06a',
+    attack: { range: 230, cd: 2.4, windup: 0.55, projSpeed: 210, minRange: 110, healAmt: 0.14, healCd: 5.5 },
+    drops: [{ id: 'potion_mana', chance: 0.14 }, { id: 'elixir_regen', chance: 0.05 }],
+    blurb: 'Cura os aliados feridos à sua volta. Prioridade absoluta: mate-o primeiro.',
+  },
+  burrower: {
+    id: 'burrower', name: 'Soterrador', hp: 150, dmg: 26, def: 6, speed: 84, xp: 78, gold: [18, 36],
+    radius: 10, sprite: 'burrower', frames: 4, ai: 'burrower', tier: 3, color: '#9a6a42',
+    attack: { range: 30, cd: 1.8, windup: 0.35, knock: 190 },
+    drops: [{ id: 'potion_hp_big', chance: 0.12 }],
+    blurb: 'Mergulha na terra e nada sob ela — intocável. Salta dos destroços quando menos espera.',
+  },
+  harpy: {
+    id: 'harpy', name: 'Harpia da Névoa', hp: 96, dmg: 20, def: 2, speed: 112, xp: 64, gold: [14, 28],
+    radius: 9, sprite: 'harpy', frames: 4, ai: 'harpy', tier: 3, color: '#c8a0e8', flyer: true,
+    attack: { range: 26, cd: 2.6, windup: 0.5, dashSpeed: 540, dashTime: 0.5, screechCd: 9 },
+    drops: [{ id: 'elixir_swift', chance: 0.05 }],
+    blurb: 'Circula, grasna e mergulha. O grito deixa você lento — e a garra não perdoa.',
+  },
+  sporeling: {
+    id: 'sporeling', name: 'Esporo Ígneo', hp: 28, dmg: 26, def: 0, speed: 106, xp: 22, gold: [3, 9],
+    radius: 7, sprite: 'sporeling', frames: 4, ai: 'kamikaze', tier: 2, color: '#a0e04a',
+    attack: { fuse: 0.65, blast: 54 },
+    drops: [{ id: 'potion_hp', chance: 0.06 }],
+    blurb: 'Corre até você e infla. Explode. Acabe com ele ANTES do abraço.',
+  },
+  stonesentry: {
+    id: 'stonesentry', name: 'Sentinela Rúnica', hp: 185, dmg: 24, def: 12, speed: 0, xp: 88, gold: [20, 40],
+    radius: 10, sprite: 'stonesentry', frames: 4, ai: 'sentry', tier: 4, color: '#9aa2b8',
+    attack: { range: 300, cd: 2.3, windup: 0.75, projSpeed: 270, minRange: 0 },
+    drops: [{ id: 'elixir_guard', chance: 0.1 }],
+    blurb: 'Guardiã de pedra que nunca persegue. Bombardeia de longe — aproxime-se ou sofra.',
+  },
   spider_queen: {
     id: 'spider_queen', name: 'Vyrka, a Rainha Aranha', hp: 1050, dmg: 30, def: 8, speed: 72, xp: 700, gold: [260, 380],
     radius: 20, sprite: 'spider_queen', frames: 4, ai: 'boss', bossKind: 'spider', tier: 5, color: '#b04ac8', boss: true,
@@ -138,6 +188,22 @@ export const ENEMIES = {
     blurb: 'Uma montanha que aprendeu a andar. Pisa forte, cai devagar.',
     phaseNames: ['Grommash racha ao meio!', 'Grommash desperta o núcleo de lava!'],
   },
+  skalla: {
+    id: 'skalla', name: 'Skalla, a Rainha do Inverno', hp: 1550, dmg: 38, def: 10, speed: 68, xp: 1050, gold: [340, 520],
+    radius: 17, sprite: 'skalla', frames: 4, ai: 'boss', bossKind: 'frost', tier: 5, color: '#6ad8ff', boss: true,
+    attack: { range: 54, cd: 1.7, windup: 0.6, knock: 260 },
+    drops: [{ id: 'potion_hp_super', chance: 1 }, { id: 'elixir_guard', chance: 0.6 }],
+    blurb: 'Governa a Cova Gélida desde antes dos homens lembrarem do frio.',
+    phaseNames: ['Skalla conjura a nevasca!', 'Skalla desperta a tempestade eterna!'],
+  },
+  ashkaru: {
+    id: 'ashkaru', name: 'Ashkaru, o Arauto de Cinzas', hp: 1980, dmg: 46, def: 16, speed: 58, xp: 1350, gold: [430, 640],
+    radius: 20, sprite: 'ashkaru', frames: 4, ai: 'boss', bossKind: 'ember', tier: 5, color: '#ff6a2a', boss: true,
+    attack: { range: 60, cd: 1.8, windup: 0.8, knock: 320 },
+    drops: [{ id: 'potion_hp_super', chance: 1 }, { id: 'scroll_thunder', chance: 0.7 }],
+    blurb: 'O Arauto guarda o Altar de Cinzas. Onde ele pisa, a terra vira brasa.',
+    phaseNames: ['Ashkaru incendeia o ar!', 'Ashkaru abre a garganta de fogo!'],
+  },
   elite: {
     id: 'elite', name: 'Chefe Orc Ghorruk', hp: 340, dmg: 32, def: 8, speed: 66, xp: 220, gold: [80, 140],
     radius: 13, sprite: 'elite', frames: 4, ai: 'brute', tier: 4, color: '#c94a4a', elite: true,
@@ -160,25 +226,25 @@ export function enemyDef(id) {
 /** Inimigos que aparecem em cada região (id, peso). */
 export const REGION_SPAWNS = {
   fields: [
-    ['slime', 6], ['slime', 4], ['goblin', 3], ['boar', 3], ['bat', 2], ['bandit', 1],
+    ['slime', 6], ['slime', 4], ['goblin', 3], ['boar', 3], ['bat', 2], ['bandit', 1], ['plague_rat', 2],
   ],
   forest: [
-    ['goblin', 5], ['wolf', 4], ['slime', 3], ['skeleton', 2], ['bat', 3], ['spider', 3], ['boar', 2], ['bandit', 2],
+    ['goblin', 5], ['wolf', 4], ['slime', 3], ['skeleton', 2], ['bat', 3], ['spider', 3], ['boar', 2], ['bandit', 2], ['plague_rat', 2], ['imp', 1],
   ],
   deepforest: [
-    ['wolf', 5], ['goblin', 4], ['direwolf', 3], ['skeleton', 3], ['spider', 5], ['bat', 3], ['cultist', 1],
+    ['wolf', 5], ['goblin', 4], ['direwolf', 3], ['skeleton', 3], ['spider', 5], ['bat', 3], ['cultist', 1], ['sporeling', 3], ['harpy', 2], ['plague_rat', 2],
   ],
   ruins: [
-    ['skeleton', 6], ['skeleton', 3], ['soldier_sword', 3], ['orc', 2], ['wraith', 3], ['cultist', 2], ['golem', 1],
+    ['skeleton', 6], ['skeleton', 3], ['soldier_sword', 3], ['orc', 2], ['wraith', 3], ['cultist', 2], ['golem', 1], ['burrower', 3], ['shaman', 2], ['stonesentry', 1],
   ],
   road: [
-    ['soldier_sword', 5], ['soldier_archer', 4], ['soldier_heavy', 2], ['bandit', 4], ['boar', 1],
+    ['soldier_sword', 5], ['soldier_archer', 4], ['soldier_heavy', 2], ['bandit', 4], ['boar', 1], ['plague_rat', 1],
   ],
   valley: [
-    ['orc', 5], ['direwolf', 4], ['soldier_heavy', 3], ['soldier_archer', 3], ['golem', 2], ['cultist', 3], ['wraith', 2], ['spider', 2],
+    ['orc', 5], ['direwolf', 4], ['soldier_heavy', 3], ['soldier_archer', 3], ['golem', 2], ['cultist', 3], ['wraith', 2], ['spider', 2], ['imp', 4], ['shaman', 2], ['burrower', 2], ['stonesentry', 2], ['harpy', 2], ['sporeling', 2],
   ],
   dungeon: [
-    ['skeleton', 4], ['orc', 4], ['slime', 2], ['soldier_heavy', 2], ['bat', 3], ['wraith', 2], ['golem', 1], ['cultist', 2],
+    ['skeleton', 4], ['orc', 4], ['slime', 2], ['soldier_heavy', 2], ['bat', 3], ['wraith', 2], ['golem', 1], ['cultist', 2], ['imp', 2], ['burrower', 2], ['stonesentry', 1], ['shaman', 1],
   ],
   bossroom: [],
 };

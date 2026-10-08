@@ -547,7 +547,7 @@ export class UI {
         <tr><td>WASD / Setas</td><td>Mover</td></tr>
         <tr><td>Mouse</td><td>Mirar</td></tr>
         <tr><td>Clique esquerdo</td><td>Atacar (segure para repetir)</td></tr>
-        <tr><td>1 / 2 / 3 / 4</td><td>Habilidades da classe (a 4ª abre no nível 5)</td></tr>
+        <tr><td>1 / 2 / 3 / 4 / 5</td><td>Habilidades da classe (a 4ª abre no nível 5; a 5ª, o golpe assinatura, no nível 8)</td></tr>
         <tr><td>Espaço</td><td>Rolamento de esquiva (invulnerável por instantes)</td></tr>
         <tr><td>E</td><td>Interagir (NPC, baú, portal)</td></tr>
         <tr><td>R</td><td>Beber poção de vida</td></tr>
@@ -566,7 +566,8 @@ export class UI {
       <h4>Dicas</h4>
       <ul>
         <li>Fale com o <b>Rei Aldric</b> no castelo ao norte da cidade. <b>Capitão Dorn</b> (estrada leste) e a <b>Caçadora Yara</b> (floresta) também dão missões.</li>
-        <li>Conclua a história principal entregando a missão do Guardião ao Rei para <b>zerar o jogo</b>. Os três chefes do mundo (Vyrka, Maldrak e Grommash) são desafios opcionais com tesouros.</li>
+        <li>Conclua a história principal entregando a missão do Guardião ao Rei para <b>zerar o jogo</b>. Os cinco chefes do mundo (Vyrka, Maldrak, Grommash, Skalla e Ashkaru) são desafios opcionais com tesouros à altura.</li>
+        <li>Todo inimigo pode soltar equipamento — comum, raro, épico, lendário ou <b style="color:#ff5470">mítico ✵</b>. Nunca se sabe o que vem de cada mob: é sorte, não lista.</li>
         <li>Baús dão equipamentos <b>da sua classe</b>; com a mochila cheia o baú não abre.</li>
         <li>O rio só se atravessa pelas pontes. Procure círculos de pedra — três áreas secretas guardam tesouros.</li>
         <li>Chefes têm fases: ao perder vida eles ficam mais perigosos. Use a esquiva nos golpes marcados em vermelho.</li>
@@ -803,11 +804,12 @@ export class UI {
   showLoot(item, source) {
     const r = RARITY[item.rarity] || RARITY.common;
     this.el.loot.innerHTML = `
-      <div class="loot-head" style="color:${r.color}">${source || 'Novo item'}</div>
+      <div class="loot-head" style="color:${r.color}">${r.gem || ''} ${source || 'Novo item'}</div>
       <div class="loot-name" style="color:${r.color}">${item.name}</div>
       <div class="loot-sub">${SLOT_INFO[item.slot] ? SLOT_INFO[item.slot].name : 'Consumível'} · ${r.name}</div>
       <div class="loot-stats">${describeStats(item.stats || {}).map((s) => `<div>${s}</div>`).join('')}</div>
       ${item.desc ? `<div class="loot-desc">${item.desc}</div>` : ''}`;
+    for (const rk of ['rare', 'epic', 'legendary', 'mythic']) this.el.loot.classList.toggle('loot-' + rk, item.rarity === rk);
     this.el.loot.classList.remove('hidden');
     this.el.loot.classList.add('show');
     sfx('chest');
@@ -821,17 +823,16 @@ export class UI {
   showDeath() {
     const g = this.game;
     const p = g.player;
-    const lossPct = g.mode === 'normal' ? 0.15 : 0.1;
     $('#death-title').textContent = 'Você caiu em batalha';
     $('#death-lives').innerHTML = p.maxLives
-      ? `<div class="lives-row">${Array.from({ length: Math.max(p.maxLives, p.lives) }, (_, i) => `<span class="heart ${i < p.lives ? 'on' : 'off'}">❤</span>`).join('')}</div>
+      ? `<div class="lives-row">${Array.from({ length: Math.max(p.maxLives, p.lives) }, (_, i) => `<span class="heart ${i < p.lives ? 'on' : 'off'}">${g.mode === 'hardcore' ? '☠' : '❤'}</span>`).join('')}</div>
          <div class="lives-note">${p.lives === 1 ? 'Última vida!' : `Vidas restantes: ${p.lives}`}</div>`
       : '';
     $('#death-stats').innerHTML = `
       <div>Nível alcançado: <b>${p.level}</b></div>
       <div>Inimigos derrotados: <b>${p.kills}</b></div>
       <div>Baús abertos: <b>${p.chestsOpened}</b></div>
-      <div>Você perderá <b>${Math.round(p.gold * lossPct)}</b> de ouro.</div>`;
+      <div>A pena da morte: <b>${p.deathGoldLoss || 0}</b> de ouro (já descontada).</div>`;
     $('#death-actions').innerHTML = '<button class="btn big" data-act="respawn">Acordar na cidade</button><div class="lives-note">(Enter ou Espaço)</div>';
     this.el.death.classList.remove('hidden');
     this.deathMode = 'respawn';
@@ -863,7 +864,7 @@ export class UI {
     const g = this.game;
     const p = g.player;
     const M = modeById(g.mode);
-    const bosses = [['spider_queen', 'Vyrka, a Rainha Aranha'], ['lich', 'Maldrak, o Rei Esquelético'], ['titan', 'Grommash, o Colosso de Pedra']];
+    const bosses = [['spider_queen', 'Vyrka, a Rainha Aranha'], ['lich', 'Maldrak, o Rei Esquelético'], ['titan', 'Grommash, o Colosso de Pedra'], ['skalla', 'Skalla, a Rainha do Inverno'], ['ashkaru', 'Ashkaru, o Arauto de Cinzas']];
     const keys = [...g.killedStatics];
     const bossLines = bosses.map(([id, nm]) => `<div class="${keys.some((k) => k.includes(`:${id}:`)) ? 'ok' : 'no'}">${keys.some((k) => k.includes(`:${id}:`)) ? '★' : '☆'} ${nm}</div>`).join('');
     const mins = Math.floor(g.stats.time / 60);
@@ -906,9 +907,12 @@ export function itemCard(it, compact, selected) {
   const r = RARITY[it.rarity] || RARITY.common;
   const slot = it.slot ? SLOT_INFO[it.slot] : { name: 'Consumível', icon: '✚' };
   const stats = describeStats(it.stats || {});
-  return `<div class="item ${it.rarity || 'common'} ${selected ? 'selected' : ''} ${compact ? 'compact' : ''}" ${it.uid ? `data-uid="${it.uid}"` : ''}>
-    <div class="i-top"><span class="i-icon">${slot.icon}</span><span class="i-name" style="color:${r.color}">${it.name}</span></div>
-    <div class="i-sub">${slot.name} · ${r.name}${it.price ? ` · ${it.price} ouro` : ''}</div>
+  const rar = it.rarity || 'common';
+  const chip = rar !== 'common'
+    ? `<span class="i-rarity" style="color:${r.color};border-color:${r.color}">${r.gem || ''} ${r.name}</span>` : '';
+  return `<div class="item ${rar} ${selected ? 'selected' : ''} ${compact ? 'compact' : ''}" style="--rc:${r.color}" ${it.uid ? `data-uid="${it.uid}"` : ''}>
+    <div class="i-top"><span class="i-icon" style="color:${rar === 'common' ? '' : r.color}">${slot.icon}</span><span class="i-name" style="color:${r.color}">${it.name}</span>${chip}</div>
+    <div class="i-sub">${slot.name}${it.price ? ` · ${it.price} ouro` : ''}</div>
     ${stats.length ? `<div class="i-stats">${stats.map((s) => `<div>${s}</div>`).join('')}</div>` : ''}
     ${it.desc ? `<div class="i-desc">${it.desc}</div>` : ''}
   </div>`;

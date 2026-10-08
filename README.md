@@ -4,10 +4,10 @@ Um **RPG 2D top-down em pixel art** medieval/fantasia, 100% jogável no navegado
 Toda a arte é **gerada proceduralmente em pixel art** (sem arquivos de imagem): sprites de
 heróis, inimigos, NPCs, construções, tiles, armas e efeitos são desenhados em código.
 
-> Explore um reino aberto com cidade, castelo, floresta, campos, ruínas, vale sombrio e uma
-> masmorra com chefe. Lute em tempo real, suba de nível, abra baús, equipe itens da sua
-> classe, faça missões e derrote o **Guardião das Profundezas** — além de três senhores
-> das trevas opcionais (Vyrka, Maldrak e Grommash).
+> Explore um reino aberto com cidade, castelo, floresta, campos, ruínas, vale sombrio,
+> montanhas geladas e uma masmorra com chefe. Lute em tempo real, suba de nível, abra baús,
+> equipe itens da sua classe, faça missões e derrote o **Guardião das Profundezas** — além
+> de **cinco senhores das trevas opcionais** (Vyrka, Maldrak, Grommash, Skalla e Ashkaru).
 
 ## Como jogar
 
@@ -27,10 +27,26 @@ Abra `http://localhost:8080` e escolha uma classe.
 |------|--------|
 | **Aventura** | Vidas ilimitadas. Ao cair você acorda na cidade e perde 15% do ouro. |
 | **Clássico** | **3 vidas** para zerar o jogo (máx. 5 com a *Pena da Fênix*). Zerou as vidas = fim de jogo e o save é apagado. Inimigos 10% mais fortes e recompensas 10% maiores. |
-| **Hardcore** | **Uma única chance.** Inimigos com +40% de vida e +35% de dano, regeneração reduzida. Morreu = save apagado. |
+| **Hardcore** | **Uma única chance.** Inimigos um passo acima (+25% de vida, +20% de dano) e regeneração reduzida. Morreu = save apagado. Sem Pena da Fênix, sem perdão. |
 
 Concluir a missão final (derrotar o Guardião) é a **vitória**: o troféu do modo/classe fica
 registrado na tela de título e você pode continuar explorando.
+
+### Loot com raridades (v2.1)
+
+Todo equipamento tem uma de **5 raridades**: Comum · Raro · Épico · **Lendário** · **Mítico** ✵.
+Inimigos comuns sorteiam um drop a cada abate (a maioria não solta nada — mas qualquer mob
+pode soltar qualquer item, inclusive lendários e míticos; as chances crescem com a riqueza da
+área e com elites/chefes). Chefes têm tabela própria e sempre entregam um espólio garantido.
+Lendários e míticos são raros de verdade: nas lojas não há míticos, e cada um tem identidade
+própria no nome e na descrição.
+
+### Novos comportamentos de combate
+
+Aranhas emboscam, diabretes batem-e-fogem, xamãs curam aliados, soterradores ficam
+intocáveis sob a terra, harpias mergulham do céu, esporos explodem e sentinelas rúnicas
+bombardeiam de longe. Cada classe ganhou uma **5ª habilidade** (nível 8): Cadeia Arcana (mago),
+Juramento de Ferro (cavaleiro), Tiro do Olho de Falcão (arqueiro) e Execução (assassino).
 
 ### Controles (teclado e mouse)
 

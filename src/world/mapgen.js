@@ -181,7 +181,13 @@ export function generateOverworld(seed = 20260828) {
   B.stroke(river, 6, TILE.WATER, { preserve: [TILE.ROAD], replace: TILE.BRIDGE, vFn: () => r.int(0, 1) });
   // lago na floresta
   B.ellipse(24, 62, 10, 7, TILE.SAND, 0);
-  B.ellipse(24, 62, 8, 5, TILE.WATER, { vFn: () => r.int(0, 1) });
+  B.ellipse(24, 62, 8, 5, TILE.WATER, 0);
+  // variantes aleatórios da margem do lago (B.ellipse recebe número, não função)
+  for (let y = -6; y <= 6; y++) for (let x = -9; x <= 9; x++) {
+    if ((x * x) / (9 * 9) + (y * y) / (6 * 6) <= 1 && B.get(24 + x, 62 + y) === TILE.WATER) {
+      B.variant[(62 + y) * B.w + (24 + x)] = r.int(0, 1);
+    }
+  }
   for (let i = 0; i < 8; i++) {
     const tx = 24 + r.int(-6, 6), ty = 62 + r.int(-4, 4);
     if (B.get(tx, ty) === TILE.WATER) B.set(tx, ty, TILE.LILY, 0);
@@ -471,6 +477,26 @@ export function generateOverworld(seed = 20260828) {
     for (const [dx, dy] of [[-4, 0], [4, 0], [0, -4], [0, 4]]) {
       B.prop('crystal:1', cx + dx, cy + dy, { h: 24, solid: [1, 1], solidTile: TILE.CRYSTAL, light: true, lightColor: '#ff8a2a', lightR: 70 });
     }
+  });
+  // Skalla, a Rainha do Inverno — alto das Montanhas do Norte (v2.1)
+  arena(150, 14, 8, TILE.STONE_FLOOR, 'Cova Gélida', 'lair_frost', 'skalla', (cx, cy, rr) => {
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2 + 0.4;
+      B.prop('crystal:0', Math.round(cx + Math.cos(a) * (rr - 1)), Math.round(cy + Math.sin(a) * (rr - 1)), { h: 26, solid: [1, 1], solidTile: TILE.CRYSTAL, light: true, lightColor: '#6ad8ff', lightR: 85 });
+    }
+    for (let i = 0; i < 8; i++) B.decal('bones', cx + r.int(-rr + 2, rr - 2), cy + r.int(-rr + 2, rr - 2));
+    for (const [dx, dy] of [[-3, -3], [3, 3]]) {
+      B.prop('torch', cx + dx, cy + dy, { h: 24, animated: 3, light: true, lightColor: '#9ae8ff', lightR: 75 });
+    }
+  });
+  // Ashkaru, o Arauto de Cinzas — oeste do Vale Sombrio (v2.1)
+  arena(150, 96, 9, TILE.STONE_FLOOR, 'Altar de Cinzas', 'lair_ember', 'ashkaru', (cx, cy, rr) => {
+    for (let i = 0; i < 12; i++) {
+      const a = (i / 12) * Math.PI * 2 + 0.2;
+      B.prop(i % 3 ? `rock:${i % 2}` : 'crystal:1', Math.round(cx + Math.cos(a) * (rr - 1)), Math.round(cy + Math.sin(a) * (rr - 1)), { h: i % 3 ? 20 : 24, solid: [1, 1], solidTile: i % 3 ? TILE.ROCK : TILE.CRYSTAL, light: i % 3 ? false : true, lightColor: '#ff6a2a', lightR: 80 });
+    }
+    for (let i = 0; i < 10; i++) B.decal('bones', cx + r.int(-rr + 2, rr - 2), cy + r.int(-rr + 2, rr - 2));
+    B.prop('crystal:1', cx, cy + 3, { h: 30, solid: [1, 1], solidTile: TILE.CRYSTAL, light: true, lightColor: '#ffd85a', lightR: 110 });
   });
 
   // decoração solta

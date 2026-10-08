@@ -34,8 +34,8 @@ canvas#game {
   cursor: crosshair;
   outline: none;
   touch-action: none;
-  /* cores mais vivas e contrastadas */
-  filter: saturate(1.28) contrast(1.07) brightness(1.03);
+  /* cores vivas e nítidas, mas sem exagero — leitura clara primeiro */
+  filter: saturate(1.18) contrast(1.06) brightness(1.04);
 }
 #ui { position: fixed; inset: 0; pointer-events: none; z-index: 10; }
 #ui button, #ui .item, #ui .sell-item, #ui .class-card, #ui .panel { pointer-events: auto; }
@@ -123,24 +123,79 @@ canvas#game {
 .panel-cols .col::-webkit-scrollbar-thumb { background: #3b3455; border-radius: 4px; }
 
 /* --- itens ----------------------------------------------------------------- */
+/* --- raridades: borda, tinta e brilho próprios ------------------------------ */
 .item {
+  position: relative; overflow: hidden;
   background: #191531; border: 2px solid #3b3455; border-radius: 5px;
-  padding: 7px 9px; margin-bottom: 7px; cursor: pointer; transition: border-color .12s, background .12s;
+  padding: 7px 9px; margin-bottom: 7px; cursor: pointer;
+  transition: border-color .12s, background .12s, box-shadow .12s;
 }
 .item:hover { background: #221d40; }
-.item.selected { border-color: var(--gold); background: #2a2348; }
-.item.empty { color: #5c5578; text-align: center; font-style: italic; cursor: default; }
-.item.rare { border-color: #2c5c86; }
-.item.epic { border-color: #6a3a96; }
-.item.legendary { border-color: #a86a1a; box-shadow: 0 0 12px rgba(255,163,42,.18); }
+.item.selected { border-color: var(--rc, var(--gold)) !important; background: #2a2348; }
+.item.empty { color: #5c5578; text-align: center; font-style: italic; cursor: default; overflow: visible; }
+.item.rare {
+  border-color: var(--rc, #2c5c86);
+  background: linear-gradient(180deg, #17233c 0%, #181534 78%);
+  box-shadow: inset 0 0 14px rgba(106,190,255,.07);
+}
+.item.epic {
+  border-color: var(--rc, #6a3a96);
+  background: linear-gradient(180deg, #241540 0%, #181534 78%);
+  box-shadow: inset 0 0 16px rgba(176,74,224,.1);
+}
+.item.legendary {
+  border-color: var(--rc, #a86a1a);
+  background: linear-gradient(180deg, #2e1f0e 0%, #1b1632 80%);
+  box-shadow: 0 0 12px rgba(255,163,42,.22), inset 0 0 18px rgba(255,163,42,.08);
+}
+.item.legendary::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(115deg, transparent 30%, rgba(255,201,58,.14) 46%, rgba(255,255,255,.1) 50%, transparent 66%);
+  background-size: 260% 100%; animation: lootSheen 3.6s ease-in-out infinite;
+}
+.item.mythic {
+  border-color: var(--rc, #ff5470);
+  background: linear-gradient(180deg, #33122a 0%, #1c1334 82%);
+  box-shadow: 0 0 16px rgba(255,84,112,.3), 0 0 3px rgba(255,214,90,.35), inset 0 0 20px rgba(255,84,112,.1);
+}
+.item.mythic::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(115deg, transparent 24%, rgba(255,84,112,.16) 40%, rgba(255,214,90,.18) 50%, rgba(122,214,255,.14) 60%, transparent 76%);
+  background-size: 300% 100%; animation: mythicShimmer 2.8s linear infinite;
+}
+@keyframes mythicShimmer { 0% { background-position: 130% 0; } 100% { background-position: -130% 0; } }
+@keyframes lootSheen { 0%, 55% { background-position: 160% 0; } 90%, 100% { background-position: -60% 0; } }
+.item.mythic .i-name { animation: mythicName 2.2s ease-in-out infinite alternate; }
+@keyframes mythicName { from { text-shadow: 0 0 6px rgba(255,84,112,.8); } to { text-shadow: 0 0 12px rgba(255,214,90,.9), 0 0 4px #fff; } }
 .i-top { display: flex; align-items: center; gap: 6px; }
-.i-icon { opacity: .7; }
-.i-name { font-size: 12px; font-weight: bold; }
+.i-icon { opacity: .85; }
+.i-name { font-size: 12px; font-weight: bold; letter-spacing: .2px; }
+.i-rarity {
+  margin-left: auto; flex: none; font-size: 7.5px; font-weight: bold;
+  letter-spacing: 1px; text-transform: uppercase;
+  border: 1px solid; border-radius: 3px; padding: 1px 4px; opacity: .95;
+  background: rgba(0,0,0,.28);
+}
 .i-sub { font-size: 9px; color: var(--muted); margin-top: 1px; }
-.i-stats { margin-top: 4px; }
+.i-stats { margin-top: 4px; position: relative; }
 .i-stats div { font-size: 10px; color: #9ae8a8; }
 .i-desc { font-size: 9px; color: var(--muted); font-style: italic; margin-top: 4px; }
 .item.compact { cursor: default; }
+
+/* raridade no cartão de loot */
+#loot-card.loot-rare { border-color: #6abefe; }
+#loot-card.loot-epic { border-color: #b06af0; box-shadow: 0 8px 26px rgba(0,0,0,.6), 0 0 18px rgba(176,74,224,.25); }
+#loot-card.loot-legendary { border-color: #ffc93a; box-shadow: 0 8px 26px rgba(0,0,0,.6), 0 0 22px rgba(255,163,42,.4); }
+#loot-card.loot-mythic {
+  border-color: #ff5470;
+  box-shadow: 0 8px 26px rgba(0,0,0,.6), 0 0 26px rgba(255,84,112,.55), 0 0 8px rgba(255,214,90,.5);
+  background: linear-gradient(180deg, #2c1028, #171126);
+  animation: mythicPulse 1.4s ease-in-out infinite alternate;
+}
+@keyframes mythicPulse {
+  from { box-shadow: 0 8px 26px rgba(0,0,0,.6), 0 0 18px rgba(255,84,112,.4), 0 0 6px rgba(255,214,90,.35); }
+  to { box-shadow: 0 8px 26px rgba(0,0,0,.6), 0 0 32px rgba(255,84,112,.7), 0 0 10px rgba(255,214,90,.6); }
+}
 
 .slot { margin-bottom: 8px; }
 .slot-label { font-size: 10px; color: var(--gold); letter-spacing: 1px; margin-bottom: 3px; text-transform: uppercase; }

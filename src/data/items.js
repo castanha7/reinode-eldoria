@@ -3,11 +3,13 @@
 // ---------------------------------------------------------------------------
 
 export const RARITY = {
-  common: { id: 'common', name: 'Comum', color: '#c9c9d4', order: 0 },
-  rare: { id: 'rare', name: 'Raro', color: '#4fa8f0', order: 1 },
-  epic: { id: 'epic', name: 'Épico', color: '#b875f0', order: 2 },
-  legendary: { id: 'legendary', name: 'Lendário', color: '#ffa32a', order: 3 },
+  common: { id: 'common', name: 'Comum', color: '#c9c9d4', order: 0, gem: '●' },
+  rare: { id: 'rare', name: 'Raro', color: '#4fa8f0', order: 1, gem: '◆' },
+  epic: { id: 'epic', name: 'Épico', color: '#b875f0', order: 2, gem: '❖' },
+  legendary: { id: 'legendary', name: 'Lendário', color: '#ffa32a', order: 3, gem: '★' },
+  mythic: { id: 'mythic', name: 'Mítico', color: '#ff5470', order: 4, gem: '✵' },
 };
+export const RARITY_ORDER = ['common', 'rare', 'epic', 'legendary', 'mythic'];
 
 export const SLOT_INFO = {
   weapon: { name: 'Arma', icon: '⚔' },
@@ -15,24 +17,30 @@ export const SLOT_INFO = {
   trinket: { name: 'Relíquia', icon: '✦' },
 };
 
+// formatador com sinal correto (corrige o bug de stats negativos "+-4")
+const sgn = (v, f) => `${v >= 0 ? '+' : '−'}${f(Math.abs(v))}`;
+const r0 = (v) => String(Math.round(v));
+const r1 = (v) => String(Math.round(v * 10) / 10);
+const p0 = (v) => `${Math.round(v * 100)}%`;
+
 export const STAT_INFO = {
-  hp: { name: 'Vida', fmt: (v) => `+${Math.round(v)}` },
-  mana: { name: 'Mana', fmt: (v) => `+${Math.round(v)}` },
-  atk: { name: 'Dano', fmt: (v) => `+${Math.round(v * 10) / 10}` },
-  def: { name: 'Defesa', fmt: (v) => `+${Math.round(v * 10) / 10}` },
-  speed: { name: 'Velocidade', fmt: (v) => `+${Math.round(v)}` },
-  atkSpeed: { name: 'Vel. de Ataque', fmt: (v) => `+${(Math.round(v * 100) / 100).toFixed(2)}/s` },
-  range: { name: 'Alcance', fmt: (v) => `+${Math.round(v)}` },
-  crit: { name: 'Chance Crítica', fmt: (v) => `+${Math.round(v * 100)}%` },
-  critDmg: { name: 'Dano Crítico', fmt: (v) => `+${Math.round(v * 100)}%` },
-  cdRed: { name: 'Red. Cooldown', fmt: (v) => `+${Math.round(v * 100)}%` },
-  manaRegen: { name: 'Regeneração', fmt: (v) => `+${Math.round(v * 10) / 10}/s` },
+  hp: { name: 'Vida', fmt: (v) => sgn(v, r0) },
+  mana: { name: 'Mana', fmt: (v) => sgn(v, r0) },
+  atk: { name: 'Dano', fmt: (v) => sgn(v, r1) },
+  def: { name: 'Defesa', fmt: (v) => sgn(v, r1) },
+  speed: { name: 'Velocidade', fmt: (v) => sgn(v, r0) },
+  atkSpeed: { name: 'Vel. de Ataque', fmt: (v) => `${(Math.round(v * 100) / 100).toFixed(2)}/s` },
+  range: { name: 'Alcance', fmt: (v) => sgn(v, r0) },
+  crit: { name: 'Chance Crítica', fmt: (v) => sgn(v, p0) },
+  critDmg: { name: 'Dano Crítico', fmt: (v) => sgn(v, p0) },
+  cdRed: { name: 'Red. Cooldown', fmt: (v) => sgn(v, p0) },
+  manaRegen: { name: 'Regeneração', fmt: (v) => sgn(v, r1) + '/s' },
   lifesteal: { name: 'Roubo de Vida', fmt: (v) => `${Math.round(v * 100)}%` },
-  projSpeed: { name: 'Vel. do Projétil', fmt: (v) => `+${Math.round(v)}` },
-  aoe: { name: 'Área de Efeito', fmt: (v) => `+${Math.round(v * 100)}%` },
-  dodge: { name: 'Esquiva', fmt: (v) => `+${Math.round(v * 100)}%` },
-  hpRegen: { name: 'Regen. de Vida', fmt: (v) => `+${Math.round(v * 10) / 10}/s` },
-  goldFind: { name: 'Ouro Extra', fmt: (v) => `+${Math.round(v * 100)}%` },
+  projSpeed: { name: 'Vel. do Projétil', fmt: (v) => sgn(v, r0) },
+  aoe: { name: 'Área de Efeito', fmt: (v) => sgn(v, p0) },
+  dodge: { name: 'Esquiva', fmt: (v) => sgn(v, p0) },
+  hpRegen: { name: 'Regen. de Vida', fmt: (v) => sgn(v, r1) + '/s' },
+  goldFind: { name: 'Ouro Extra', fmt: (v) => sgn(v, p0) },
 };
 
 // [nome, raridade, stats, preço, descrição]
@@ -49,6 +57,7 @@ const TABLE = {
       ['Varinha de Cristal Vivo', 'rare', { atk: 14, mana: 20, hpRegen: 0.8 }, 400, 'O cristal cresce devagar, alimentando-se de mana.'],
       ['Cajado da Tempestade', 'epic', { atk: 29, projSpeed: 90, crit: 0.07, aoe: 0.12 }, 1250, 'Relâmpagos dançam entre os dentes da ponta.'],
       ['Olho do Cometa', 'legendary', { atk: 52, range: 40, cdRed: 0.25, aoe: 0.3, critDmg: 0.35, mana: 50 }, 3600, 'Dizem que foi arrancado de um meteoro ainda em chamas.'],
+      ['Cetro do Firmamento', 'mythic', { atk: 61, range: 55, cdRed: 0.3, crit: 0.15, critDmg: 0.45, aoe: 0.35, mana: 70, manaRegen: 6 }, 7400, 'As estrelas respondem a quem o ergue — e obedecem.'],
     ],
     armor: [
       ['Manto de Tecido Gasto', 'common', { hp: 12, def: 1 }, 40, 'Mais remendo que tecido.'],
@@ -59,6 +68,7 @@ const TABLE = {
       ['Manto do Arquimago', 'legendary', { hp: 120, def: 12, mana: 80, manaRegen: 5, cdRed: 0.15 }, 2800, 'Bordado com as constelações do norte.'],
       ['Robe do Feiticeiro Errante', 'rare', { hp: 50, def: 5, speed: 6, mana: 25 }, 480, 'Gasto nas barras, firme nas runas.'],
       ['Veste da Aurora', 'epic', { hp: 90, def: 9, mana: 60, hpRegen: 1.2, cdRed: 0.08 }, 1300, 'Brilha em tons de rosa e dourado ao amanhecer.'],
+      ['Manto do Eclipse', 'mythic', { hp: 150, def: 15, mana: 100, manaRegen: 7, cdRed: 0.2, dodge: 0.1 }, 6800, 'Costurado com a hora exata em que o sol morre.'],
     ],
     trinket: [
       ['Anel de Foco', 'common', { mana: 25, manaRegen: 1.5 }, 90, 'Ajuda a manter a mente firme.'],
@@ -67,6 +77,7 @@ const TABLE = {
       ['Tiara do Sábio', 'legendary', { hp: 60, mana: 60, atk: 18, cdRed: 0.15 }, 2600, 'Coroa dos que trocaram o sono por conhecimento.'],
       ['Grimório Miniatura', 'rare', { atk: 7, mana: 30, cdRed: 0.06 }, 450, 'Cabe no bolso, pesa na consciência.'],
       ['Pingente de Safira', 'epic', { mana: 55, manaRegen: 3.5, aoe: 0.15, goldFind: 0.1 }, 1150, 'A pedra sussurra feitiços esquecidos.'],
+      ['Lágrima de Selene', 'mythic', { atk: 24, mana: 90, cdRed: 0.28, crit: 0.12, hpRegen: 1.5 }, 6200, 'Uma lágrima da lua que escolheu um feiticeiro como herdeiro.'],
     ],
   },
   knight: {
@@ -81,6 +92,7 @@ const TABLE = {
       ['Machado de Guerra Anão', 'rare', { atk: 17, def: 2, hp: 18, critDmg: 0.15 }, 520, 'Feito por mãos que sabem o peso do aço.'],
       ['Espada Flamejante', 'epic', { atk: 31, aoe: 0.1, crit: 0.06, range: 6 }, 1280, 'Deixa um rastro de brasas no ar.'],
       ['Lâmina do Alvorecer', 'legendary', { atk: 55, hp: 90, def: 12, range: 10, lifesteal: 0.09, hpRegen: 1.5 }, 3700, 'Cada golpe lembra a luz de um novo dia.'],
+      ['Espada dos Reis Caídos', 'mythic', { atk: 64, hp: 120, def: 16, crit: 0.14, critDmg: 0.4, lifesteal: 0.1, range: 12 }, 7600, 'Empunhada por todos os reis de Eldoria. Lembra-se de cada um.'],
     ],
     armor: [
       ['Armadura de Couro Batido', 'common', { hp: 22, def: 3 }, 50, 'Cheira a estábulo.'],
@@ -91,6 +103,7 @@ const TABLE = {
       ['Armadura do Paladino', 'legendary', { hp: 190, def: 26, lifesteal: 0.05 }, 3000, 'Nenhum cavaleiro que a vestiu caiu em batalha.'],
       ['Placas do Leão', 'epic', { hp: 150, def: 20, hpRegen: 1.4 }, 1400, 'O leão dourado no peito jamais recuou.'],
       ['Couraça do Colosso', 'legendary', { hp: 230, def: 30, atk: 8, hpRegen: 2 }, 3400, 'Arrancada do corpo de um titã de pedra.'],
+      ['Égide do Alvorecer', 'mythic', { hp: 285, def: 36, atk: 10, hpRegen: 2.6 }, 7100, 'A última muralha de Eldoria cabe num peito.'],
     ],
     trinket: [
       ['Anel de Vigor', 'common', { hp: 30 }, 95, 'Sangue quente, coração firme.'],
@@ -100,6 +113,7 @@ const TABLE = {
       ['Medalha do Paladino', 'legendary', { atk: 20, hp: 80, def: 10, crit: 0.08 }, 2700, 'Concedida apenas aos imortais.'],
       ['Escudo Menor de Ferro', 'common', { def: 4, hp: 15 }, 110, 'Pequeno, mas já salvou muitas costelas.'],
       ['Brasão do Cruzado', 'epic', { hp: 70, def: 12, atk: 8, goldFind: 0.12 }, 1180, 'Brasão de uma ordem que ninguém lembra mais.'],
+      ['Coração do Baluarte', 'mythic', { hp: 140, def: 22, atk: 14, lifesteal: 0.09, hpRegen: 1.8 }, 6500, 'Bate no ritmo dos que nunca recuaram.'],
     ],
   },
   archer: {
@@ -114,6 +128,7 @@ const TABLE = {
       ['Arco de Osso de Dragão', 'rare', { atk: 16, range: 30, critDmg: 0.2 }, 520, 'Curvado em osso que ainda guarda calor.'],
       ['Arco Gêmeo do Crepúsculo', 'epic', { atk: 27, atkSpeed: 0.3, aoe: 0.1, crit: 0.07 }, 1280, 'Duas cordas, duas flechas, nenhum remorso.'],
       ['Arco do Último Suspiro', 'legendary', { atk: 50, range: 80, crit: 0.18, critDmg: 0.45, projSpeed: 120 }, 3700, 'Quem o empunhou nunca falhou o primeiro tiro.'],
+      ['Arco da Estrela Cadente', 'mythic', { atk: 59, range: 95, atkSpeed: 0.55, crit: 0.22, critDmg: 0.55, projSpeed: 190 }, 7500, 'A flecha chega antes do som, sempre.'],
     ],
     armor: [
       ['Couro Leve', 'common', { hp: 14, def: 2, speed: 3 }, 45, 'Silencioso como a floresta.'],
@@ -124,6 +139,7 @@ const TABLE = {
       ['Couraça do Falcão', 'legendary', { hp: 130, def: 16, speed: 18, crit: 0.1 }, 2850, 'Penas de ouro que param espadas.'],
       ['Capa de Folhas Vivas', 'rare', { hp: 52, def: 6, hpRegen: 1, speed: 6 }, 500, 'As folhas se regeneram quando você está ferido.'],
       ['Gibão da Caça Selvagem', 'epic', { hp: 90, def: 11, speed: 12, crit: 0.06, goldFind: 0.1 }, 1250, 'Peles dos animais mais difíceis da floresta.'],
+      ['Manto do Vento Antigo', 'mythic', { hp: 160, def: 19, speed: 24, dodge: 0.14, hpRegen: 1.6 }, 6900, 'O vento que existia antes das montanhas ainda o veste.'],
     ],
     trinket: [
       ['Aljava Rápida', 'common', { atkSpeed: 0.22 }, 100, 'Flechas sempre à mão.'],
@@ -132,6 +148,7 @@ const TABLE = {
       ['Olho de Águia', 'legendary', { range: 70, crit: 0.15, atk: 15, atkSpeed: 0.3 }, 2700, 'Enxerga a presa a um quilômetro.'],
       ['Aljava Sem Fundo', 'rare', { atkSpeed: 0.3, atk: 4, projSpeed: 40 }, 460, 'Nunca esvazia. Ninguém sabe por quê.'],
       ['Totem do Caçador', 'epic', { atk: 12, crit: 0.1, hpRegen: 1, speed: 10 }, 1180, 'Entalhado com os rostos das presas mais valiosas.'],
+      ['Olho do Sol Nascente', 'mythic', { atk: 22, range: 90, crit: 0.18, atkSpeed: 0.4, goldFind: 0.18 }, 6400, 'Enxerga o amanhã — e acerta ontem.'],
     ],
   },
   assassin: {
@@ -146,6 +163,7 @@ const TABLE = {
       ['Facas de Arremesso Gêmeas', 'rare', { atk: 16, atkSpeed: 0.28, speed: 6 }, 520, 'Leves demais para o peso do que fazem.'],
       ['Lâminas do Eclipse', 'epic', { atk: 30, crit: 0.12, atkSpeed: 0.25, critDmg: 0.2 }, 1300, 'Sombra e luz brigam em cada corte.'],
       ['Sussurro Final', 'legendary', { atk: 54, crit: 0.22, critDmg: 0.5, lifesteal: 0.08, atkSpeed: 0.4 }, 3700, 'É a última coisa que você ouve.'],
+      ['Adagas do Crepúsculo Eterno', 'mythic', { atk: 63, atkSpeed: 0.6, crit: 0.28, critDmg: 0.6, lifesteal: 0.12, speed: 16 }, 7700, 'Forjadas no intervalo entre dois suspiros.'],
     ],
     armor: [
       ['Trajes Rasgados', 'common', { hp: 12, speed: 4 }, 45, 'Melhor do que nada.'],
@@ -156,6 +174,7 @@ const TABLE = {
       ['Manto do Ceifador', 'legendary', { hp: 125, def: 14, speed: 22, dodge: 0.18, lifesteal: 0.06 }, 2900, 'A última coisa que muitos veem.'],
       ['Couro de Víbora', 'rare', { hp: 48, def: 5, speed: 12, crit: 0.04 }, 520, 'Escamas verde-escuras, silenciosas ao toque.'],
       ['Manto da Lua Nova', 'epic', { hp: 88, def: 8, speed: 18, dodge: 0.12, goldFind: 0.1 }, 1260, 'Invisível em noites sem lua.'],
+      ['Véu da Meia-Noite', 'mythic', { hp: 145, def: 16, speed: 26, dodge: 0.2, lifesteal: 0.07 }, 7000, 'A noite inteira coube num tecido.'],
     ],
     trinket: [
       ['Luvas Letais', 'common', { atkSpeed: 0.25 }, 100, 'Cortes mais rápidos, menos pensados.'],
@@ -164,6 +183,7 @@ const TABLE = {
       ['Capa Espectral', 'legendary', { cdRed: 0.22, speed: 18, atk: 18, crit: 0.12 }, 2750, 'Atravessa paredes de vez em quando.'],
       ['Máscara de Porcelana', 'rare', { crit: 0.08, dodge: 0.05, goldFind: 0.08 }, 440, 'Sorri mesmo quando você não está.'],
       ['Colar de Dentes', 'epic', { atk: 14, crit: 0.1, lifesteal: 0.05, hpRegen: 0.8 }, 1210, 'Cada dente conta uma história que você preferia não ouvir.'],
+      ['Selo da Primeira Sombra', 'mythic', { atk: 22, cdRed: 0.3, speed: 20, crit: 0.16, dodge: 0.1 }, 6600, 'Antes das sombras existirem, alguém as assinou.'],
     ],
   },
 };
@@ -223,12 +243,13 @@ export function rarityWeights(regionTier) {
     rare: 26 + t * 9,
     epic: 6 + t * 7,
     legendary: 0.6 + t * 2.4,
+    mythic: t >= 3 ? 0.03 + (t - 2) * 0.09 : 0, // só em áreas de alto risco; raríssimo
   };
 }
 
 export function rollRarity(rand, regionTier) {
   const w = rarityWeights(regionTier);
-  const entries = Object.entries(w);
+  const entries = Object.entries(w).filter(([, v]) => v > 0);
   let total = 0;
   for (const [, v] of entries) total += v;
   let r = rand() * total;
@@ -242,12 +263,71 @@ export function rollRarity(rand, regionTier) {
 /** Escolhe um equipamento adequado à classe do jogador. */
 export function rollEquipment(rand, cls, regionTier) {
   const rarity = rollRarity(rand, regionTier);
-  const slot = rand() < 0.4 ? 'weapon' : rand() < 0.58 ? 'armor' : 'trinket';
-  let pool = ITEMS.filter((i) => i.cls === cls && i.slot === slot && i.rarity === rarity);
-  if (!pool.length) pool = ITEMS.filter((i) => i.cls === cls && i.slot === slot);
+  return pickEquipmentOfRarity(rand, cls, rarity, regionTier);
+}
+
+/**
+ * Escolhe um equipamento de uma raridade específica, com fallback para a
+ * mais alta disponível se a raridade pedida não tiver itens para a classe.
+ */
+export function pickEquipmentOfRarity(rand, cls, rarity, regionTier = 1) {
+  let order = RARITY[rarity] ? RARITY[rarity].order : 0;
+  let pool = [];
+  while (order >= 0 && !pool.length) {
+    const key = RARITY_ORDER[order];
+    pool = ITEMS.filter((i) => i.cls === cls && i.slot && i.rarity === key);
+    if (pool.length) rarity = key;
+    order--;
+  }
+  if (!pool.length) pool = ITEMS.filter((i) => i.cls === cls && i.slot);
   if (!pool.length) pool = ITEMS.filter((i) => i.cls === cls);
   const base = pool[Math.floor(rand() * pool.length)];
   return instantiate(base, regionTier);
+}
+
+// ---------------------------------------------------------------------------
+// Sistema de drop dos mobs — pesos por 100 na ordem
+// [nada, comum, raro, épico, lendário, mítico].
+// Qualquer mob pode dropar qualquer item (da classe do jogador): o que muda é
+// a RIQUEZA DA ÁREA (tier 1..4), nunca um item específico por mob — assim o
+// resultado permanece aleatório e imprevisível.
+// ---------------------------------------------------------------------------
+export const MOB_LOOT = {
+  mob: [
+    [80, 14.5, 4.0, 1.1, 0.32, 0.08], // tier 1
+    [74, 18, 5.2, 1.9, 0.7, 0.15],    // tier 2
+    [67, 21, 7.0, 3.3, 1.3, 0.3],     // tier 3
+    [60, 23, 9.0, 4.6, 2.4, 0.6],     // tier 4
+  ],
+  elite: [30, 28, 25, 12, 3.8, 1.2],
+  boss: [0, 16, 36, 31, 14, 3],
+};
+
+/** Sorteia a raridade do drop de um mob (null = sem item). */
+export function rollMobLoot(rand, tier = 1, kind = 'mob') {
+  let w;
+  if (kind === 'boss') w = MOB_LOOT.boss;
+  else if (kind === 'elite') w = MOB_LOOT.elite;
+  else {
+    const t = Math.max(1, Math.min(4, Math.round(tier) || 1));
+    w = MOB_LOOT.mob[t - 1];
+  }
+  let total = 0;
+  for (const v of w) total += v;
+  let r = rand() * total;
+  for (let i = 0; i < w.length; i++) {
+    r -= w[i];
+    if (r <= 0) return i === 0 ? null : RARITY_ORDER[i - 1];
+  }
+  return null;
+}
+
+/** Rolagem completa de drop: raridade + equipamento adequado à classe. */
+export function rollMobDrop(rand, cls, tier, kind = 'mob') {
+  const rarity = rollMobLoot(rand, tier, kind);
+  if (!rarity) return null;
+  const effTier = kind === 'mob' ? Math.max(1, Math.min(4, Math.round(tier) || 1)) : 4;
+  return pickEquipmentOfRarity(rand, cls, rarity, effTier);
 }
 
 /** Cria uma instância do item, escalando levemente com o nível da área. */
