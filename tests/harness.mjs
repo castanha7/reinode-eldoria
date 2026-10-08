@@ -120,6 +120,9 @@ class FakeElement {
   addEventListener(t, fn) { (this.listeners[t] ||= []).push(fn); }
   removeEventListener() {}
   closest(sel) { return this.dataset.act ? this : null; }
+  setPointerCapture() {}
+  releasePointerCapture() {}
+  getBoundingClientRect() { return { left: 0, top: 0, width: 50, height: 50 }; }
   click() { (this.listeners.click || []).forEach((f) => f({ target: this, preventDefault() {} })); }
 }
 
@@ -139,6 +142,7 @@ export function installDom() {
       return new FakeElement(tag);
     },
     querySelector: getEl,
+    getElementById: (id) => getEl('#' + id),
     querySelectorAll: () => [],
     addEventListener() {},
     removeEventListener() {},

@@ -91,7 +91,9 @@ export class Game {
     this.canvas.style.width = window.innerWidth + 'px';
     this.canvas.style.height = window.innerHeight + 'px';
     this.viewScale = w / window.innerWidth;
-    this.camera.resize(w, h, 3 * this.viewScale);
+    // zoom adaptativo: em telas pequenas (celular) mostra mais do mapa
+    const cssZoom = Math.round(Math.max(1.6, Math.min(3, window.innerWidth / 340, window.innerHeight / 190)) * 4) / 4;
+    this.camera.resize(w, h, cssZoom * this.viewScale);
     this.screenW = w;
     this.screenH = h;
     if (!this.lightCanvas || this.lightCanvas.width !== w || this.lightCanvas.height !== h) {

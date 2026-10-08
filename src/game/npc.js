@@ -49,9 +49,10 @@ export class Npc {
     const d = Math.hypot(dx, dy);
     if (d < 3) { this.wanderGoal = null; return; }
     const sp = this.def.role === 'pet' ? 34 : 24;
-    const m = game.map.move(this.x, this.y, (dx / d) * sp * dt, (dy / d) * sp * dt, 5);
-    if (Math.hypot(m.x - this.x, m.y - this.y) < 0.02) { this.wanderGoal = null; return; }
-    this.x = m.x; this.y = m.y;
+    // colisão no corpo (4px acima dos pés): os pés de NPCs ficam na borda inferior do tile
+    const m = game.map.move(this.x, this.y - 4, (dx / d) * sp * dt, (dy / d) * sp * dt, 4);
+    if (Math.hypot(m.x - this.x, (m.y + 4) - this.y) < 0.02) { this.wanderGoal = null; return; }
+    this.x = m.x; this.y = m.y + 4;
     this.moving = true;
     this.facing = facingFromAngle(Math.atan2(dy, dx));
     this.baseFacing = this.facing;

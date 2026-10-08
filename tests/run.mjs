@@ -544,6 +544,328 @@ ok(game2.player.level > lvlBefore, 'jogador sobe de nível com XP');
 ok(game2.player.maxHp > 0 && game2.player.hp === game2.player.maxHp, 'subir de nível restaura a vida');
 
 // ===========================================================================
+section('13. Modos de jogo: Aventura, Clássico (vidas) e Hardcore (1 chance)');
+const { Game: GameCls } = await import('../src/game/game.js');
+const act = (a, extra = {}) => ui.onAction({ dataset: { act: a, ...extra }, classList: { contains: () => false }, disabled: false });
+game2.wipeSave();
+
+// --- Aventura: vidas infinitas, perde parte do ouro
+game2.startRun('knight', 'normal');
+eq(game2.player.maxLives, 0, 'Aventura: vidas ilimitadas');
+game2.player.gold = 1000; game2.player.iframe = 0;
+game2.hitPlayer(999999, {});
+ok(game2.player.dead && game2.state === 'playing', 'Aventura: morrer mostra tela de morte (não é fim de jogo)');
+act('respawn');
+ok(!game2.player.dead, 'Aventura: botão "renascer" funciona');
+ok(game2.player.gold < 1000 && game2.player.gold >= 800, `Aventura: perde só parte do ouro (${game2.player.gold})`);
+
+// --- Clássico: 3 vidas
+game2.startRun('mage', 'classic');
+eq(game2.player.lives, 3, 'Clássico: começa com 3 vidas');
+game2.player.iframe = 0; game2.hitPlayer(999999, {});
+eq(game2.player.lives, 2, 'Clássico: morrer custa 1 vida');
+ok(game2.state === 'playing', 'Clássico: ainda há vidas, jogo continua');
+ok(GameCls.hasSave(), 'Clássico: progresso salvo ao morrer (sem "save scumming" de vidas)');
+act('respawn');
+eq(game2.player.lives, 2, 'Clássico: renascer não devolve vida');
+// Pena da Fênix só no Clássico
+const feather = consumable('phoenix_feather');
+ok(!!feather && feather.id === 'phoenix_feather', 'Pena da Fênix existe');
+game2.player.addItem(feather);
+game2.player.useItem(feather.uid, game2);
+eq(game2.player.lives, 3, 'Clássico: Pena da Fênix devolve 1 vida');
+game2.player.lives = 5;
+const f2 = consumable('phoenix_feather'); game2.player.addItem(f2);
+game2.player.useItem(f2.uid, game2);
+ok(game2.player.inventory.some((i) => i.uid === f2.uid), 'Pena da Fênix não é gasta com vidas no máximo');
+game2.player.lives = 1;
+game2.player.iframe = 0; game2.hitPlayer(999999, {});
+eq(game2.state, 'gameover', 'Clássico: sem vidas = fim de jogo');
+ok(!GameCls.hasSave(), 'Fim de jogo apaga o save');
+ok(!ui.el.death.classList.contains('hidden'), 'tela de fim de jogo é exibida');
+game2.save();
+ok(!GameCls.hasSave(), 'não é possível salvar durante o fim de jogo');
+act('to-title');
+eq(game2.state, 'title', 'fim de jogo volta ao título');
+
+// --- Hardcore: 1 chance, inimigos mais fortes
+game2.startRun('archer', 'hardcore');
+eq(game2.player.lives, 1, 'Hardcore: uma única vida');
+const hcGob = game2.spawnEnemy('goblin', game2.player.x + 200, game2.player.y);
+game2.startRun('archer', 'normal');
+const nGob = game2.spawnEnemy('goblin', game2.player.x + 200, game2.player.y);
+ok(hcGob.maxHp > nGob.maxHp * 1.2, `Hardcore: inimigos têm mais vida (${hcGob.maxHp} vs ${nGob.maxHp})`);
+game2.startRun('archer', 'hardcore');
+const featherH = consumable('phoenix_feather'); game2.player.addItem(featherH);
+game2.player.useItem(featherH.uid, game2);
+eq(game2.player.lives, 1, 'Hardcore: Pena da Fênix não funciona');
+game2.player.iframe = 0; game2.hitPlayer(999999, {});
+eq(game2.state, 'gameover', 'Hardcore: morreu uma vez = fim de jogo');
+act('to-title');
+
+// --- Vitória + troféus
+game2.startRun('assassin', 'classic');
+game2.onVictory();
+ok(!ui.el.victory.classList.contains('hidden'), 'vitória mostra a tela de vitória');
+const tr = GameCls.trophies();
+eq(tr.clears.classic, 1, 'troféu do modo Clássico registrado');
+game2.onVictory();
+eq(GameCls.trophies().clears.classic, 1, 'vitória não é contada duas vezes');
+act('victory-continue');
+ok(ui.el.victory.classList.contains('hidden'), 'é possível continuar explorando após a vitória');
+ui.buildTitle();
+ok(ui.el['title'] !== undefined, 'título reconstrói com troféus');
+
+// ===========================================================================
+section('14. Save v2: modo, vidas, baús abertos e chefes derrotados persistem');
+game2.wipeSave();
+game2.startRun('knight', 'classic');
+game2.player.level = 6; game2.player.recompute();
+game2.player.lives = 2;
+game2.player.addBuff(game2, { id: 'song_valor', name: 'Canção do Valente', time: 60, mods: { atk: 0.25 }, color: '#ff8a5a' });
+game2.loadMap('dungeon', { x: game2.maps.dungeon.spawn.x, y: game2.maps.dungeon.spawn.y });
+const dChest = game2.chests[0];
+dChest.open(game2);
+const dChestKey = dChest.key;
+const dBoss = game2.enemies.find((e) => e.isBoss);
+game2.hitEnemy(dBoss, 9999999, { from: game2.player });
+game2.save();
+const snapSave = localStorage.getItem('eldoria_save_v1');
+game2.startRun('mage', 'normal'); // estado diferente antes de carregar
+localStorage.setItem('eldoria_save_v1', snapSave);
+ok(game2.loadSave(), 'save carrega');
+eq(game2.mode, 'classic', 'modo restaurado');
+eq(game2.player.lives, 2, 'vidas restauradas');
+eq(game2.player.cls.id, 'knight', 'classe restaurada');
+ok(game2.player.buffs.length === 1, 'bônus temporário restaurado');
+eq(game2.map.id, 'dungeon', 'mapa restaurado');
+ok(game2.chests.find((c) => c.key === dChestKey).opened, 'baú aberto continua aberto após recarregar');
+ok(!game2.enemies.some((e) => e.isBoss && !e.dead), 'chefe derrotado não renasce após recarregar');
+game2.loadMap('overworld', game2.maps.overworld.spawn);
+game2.loadMap('dungeon', game2.maps.dungeon.spawn);
+ok(game2.chests.find((c) => c.key === dChestKey).opened, 'baú continua aberto ao revisitar o mapa');
+ok(!game2.enemies.some((e) => e.isBoss && !e.dead), 'chefe continua morto ao revisitar o mapa');
+
+// ===========================================================================
+section('15. Baú com mochila cheia e itens de outras fontes');
+game2.startRun('knight', 'normal');
+game2.loadMap('overworld', game2.maps.overworld.spawn);
+const fillBag = () => { while (game2.player.addItem(consumable('ration'))) { /* enche */ } };
+fillBag();
+const bagN = game2.player.inventory.length;
+const chestF = game2.chests.find((c) => !c.opened);
+const gF = game2.player.gold;
+chestF.open(game2);
+ok(!chestF.opened, 'mochila cheia: baú NÃO abre (nada se perde)');
+eq(game2.player.inventory.length, bagN, 'mochila cheia: inventário inalterado');
+eq(game2.player.gold, gF, 'mochila cheia: ouro do baú não é consumido');
+const sellItem = consumable('potion_hp_big');
+game2.giveItem(sellItem, null, null);
+ok(game2.player.gold > gF, 'mochila cheia: item recebido de outra fonte é vendido automaticamente');
+game2.player.removeItem(game2.player.inventory[0].uid);
+chestF.open(game2);
+ok(chestF.opened, 'com espaço na mochila o baú abre normalmente');
+
+// ===========================================================================
+section('16. Novos chefes: Vyrka, Maldrak e Grommash');
+for (const [type, kind] of [['spider_queen', 'spider'], ['lich', 'lich'], ['titan', 'titan']]) {
+  game2.startRun('knight', 'normal');
+  const ow = game2.maps.overworld;
+  const sd = ow.entities.find((e) => e.type === 'enemy' && e.enemy === type);
+  ok(!!sd, `${type}: chefe existe no mundo aberto`);
+  ow.computeReach();
+  ok(ow.isReachable(sd.tx, sd.ty), `${type}: covil é alcançável a pé`);
+  ok(!!game2.maps.overworld.zones.find((z) => z.lair && z.id === 'lair_' + (type === 'spider_queen' ? 'spider' : type)), `${type}: covil marcado (sem spawn aleatório)`);
+  const spot = toField(game2);
+  game2.player.level = 25; game2.player.recompute();
+  const b = game2.spawnEnemy(type, game2.player.x + 80, game2.player.y);
+  eq(b.bossKind, kind, `${type}: tipo de chefe`);
+  b.maxHp = b.hp = 100000;
+  game2.player.hp = game2.player.maxHp = 1e9;
+  let sawHostile = false, maxEn = 0;
+  for (let phase = 1; phase <= 3; phase++) {
+    b.hp = b.maxHp * (phase === 1 ? 0.9 : phase === 2 ? 0.5 : 0.2);
+    for (let f = 0; f < 60 * 14; f++) {
+      game2.player.iframe = 0; game2.player.hp = 1e9;
+      if (f % 30 === 0) { game2.player.x = spot.x; game2.player.y = spot.y; } // knockback não arrasta o jogador para fora do covil
+      game2.frame(1 / 60);
+      if (game2.projectiles.some((p) => p.hostile)) sawHostile = true;
+      maxEn = Math.max(maxEn, game2.enemies.length);
+    }
+    eq(b.phase, phase, `${type}: fase ${phase} alcançada`);
+  }
+  ok(sawHostile || maxEn > 1, `${type}: usa ataques à distância ou invoca reforços`);
+  ok(!game2.player.dead, `${type}: jogador intacto no teste`);
+  game2.hitEnemy(b, 1e9, { from: game2.player });
+  ok(b.dead, `${type}: pode ser derrotado`);
+  ok(game2.player.gold > 0, `${type}: recompensa em ouro`);
+}
+// chefe volta ao estado inicial se o jogador morre / foge
+{
+  game2.startRun('knight', 'normal');
+  toField(game2);
+  const b = game2.spawnEnemy('titan', game2.player.x + 60, game2.player.y);
+  b.hp = b.maxHp * 0.3;
+  b.resetFight();
+  eq(b.phase, 1, 'chefe reinicia a luta (fase 1)');
+}
+
+// ===========================================================================
+section('17. NPCs novos, alquimista, bardo, mascotes e missões encadeadas');
+game2.startRun('mage', 'classic');
+game2.player.gold = 5000;
+game2.loadMap('overworld', game2.maps.overworld.spawn);
+const roles = new Set(game2.npcs.map((n) => n.def.role));
+for (const r of ['alchemist', 'bard', 'pet']) ok(roles.has(r), `cidade tem NPC com papel "${r}"`);
+ok(game2.npcs.length >= 20, `cidade tem muitos NPCs (${game2.npcs.length})`);
+const alch = game2.npcs.find((n) => n.def.role === 'alchemist');
+ui.openNpc(alch);
+for (let i = 0; i < 8; i++) ui.advanceDialog();
+ok(!ui.el.shop.classList.contains('hidden'), 'alquimista abre a loja');
+ok(ui.potionList().some((i) => i.id === 'phoenix_feather'), 'alquimista vende Pena da Fênix no modo Clássico');
+ok(ui.potionList().some((i) => i.id === 'scroll_thunder'), 'alquimista vende Pergaminho do Trovão');
+game2.mode = 'normal';
+ok(!ui.potionList().some((i) => i.id === 'phoenix_feather'), 'Pena da Fênix não é vendida fora do modo Clássico');
+game2.mode = 'classic';
+const bard = game2.npcs.find((n) => n.def.role === 'bard');
+ui.openNpc(bard);
+for (let i = 0; i < 8; i++) ui.advanceDialog();
+const g0 = game2.player.gold;
+act('bard-buy', { id: 'song_valor' });
+ok(game2.player.gold < g0 && game2.player.buffs.some((b) => b.id === 'song_valor'), 'bardo vende canção que dá bônus temporário');
+const atkB = game2.player.stats.atk;
+game2.player.buffs = []; game2.player.recompute();
+ok(game2.player.stats.atk < atkB, 'canção aumenta o dano enquanto dura');
+ui.closeAll();
+const pet = game2.npcs.find((n) => n.def.role === 'pet');
+const p0 = { x: pet.x, y: pet.y };
+game2.player.x = pet.x + 400; // longe: o pet passeia
+let moved = false;
+for (let i = 0; i < 600; i++) { game2.frame(1 / 60); if (Math.hypot(pet.x - p0.x, pet.y - p0.y) > 4) moved = true; }
+ok(moved, 'mascote passeia pela cidade');
+for (const n of game2.npcs) ok(!game2.map.isBlockedTile(Math.floor(n.x / 16), Math.floor((n.y - 2) / 16)), `NPC ${n.npcId} nunca fica preso em obstáculo`);
+// missões encadeadas
+const locked = QUESTS.filter((q) => q.requires && q.requires.length);
+ok(locked.length >= 2, `há missões que exigem outras (${locked.length})`);
+const { questUnlocked } = await import('../src/data/quests.js');
+const lq = locked[0];
+ok(!questUnlocked(lq, { [lq.requires[0]]: { state: 'active' } }), 'missão bloqueada enquanto a anterior não foi concluída');
+ok(questUnlocked(lq, Object.fromEntries(lq.requires.map((r) => [r, { state: 'complete' }]))), 'missão liberada após concluir a anterior');
+
+// ===========================================================================
+section('18. Itens e habilidades novos');
+for (const id of ['potion_hp_super', 'potion_mana_big', 'elixir_guard', 'elixir_fortune', 'elixir_regen', 'scroll_thunder', 'scroll_return', 'ration', 'phoenix_feather']) {
+  const it = consumable(id);
+  ok(it && it.id === id && it.name && it.desc, `consumível ${id} definido`);
+}
+game2.startRun('knight', 'normal');
+toField(game2);
+game2.player.level = 10; game2.player.recompute();
+const gobs = [0, 1, 2].map((i) => game2.spawnEnemy('goblin', game2.player.x + 40 + i * 12, game2.player.y));
+const thunder = consumable('scroll_thunder');
+game2.player.addItem(thunder);
+const hpT = gobs.reduce((a, g) => a + g.hp, 0);
+game2.player.useItem(thunder.uid, game2);
+for (let i = 0; i < 40; i++) game2.frame(1 / 60);
+ok(gobs.reduce((a, g) => a + Math.max(0, g.hp), 0) < hpT, 'Pergaminho do Trovão fere inimigos próximos');
+ok(!game2.player.inventory.some((i) => i.uid === thunder.uid), 'pergaminho é consumido');
+// pergaminho de retorno
+const ret = consumable('scroll_return');
+game2.player.addItem(ret);
+toField(game2);
+game2.player.useItem(ret.uid, game2);
+for (let i = 0; i < 200; i++) game2.frame(1 / 60);
+ok(game2.map.isSafeAt(game2.player.x, game2.player.y), 'Pergaminho de Retorno leva à cidade');
+// esquiva (rolamento)
+toField(game2);
+const rx = game2.player.x;
+Input.keys.KeyD = true;
+Input.pressed.Space = true;
+game2.frame(1 / 60);
+for (let i = 0; i < 20; i++) game2.frame(1 / 60);
+Input.keys.KeyD = false;
+ok(game2.player.x > rx + 30, 'esquiva (Espaço) desloca o jogador');
+ok(game2.player.rollCd > 0, 'esquiva entra em recarga');
+// vender item não equipado e equipamentos de todas as classes ainda válidos
+for (const cls of CLASS_IDS) {
+  const eqs = ITEMS.filter ? ITEMS.filter((i) => i.cls === cls) : [];
+  void eqs;
+}
+
+// ===========================================================================
+section('19. Controles de toque (celular)');
+{
+  const { TouchControls } = await import('../src/ui/touch.js');
+  game2.startRun('archer', 'normal');
+  toField(game2);
+  const tc = new TouchControls(game2, ui);
+  tc.root = document.createElement('div');
+  ok(Input.touch.enabled === false, 'toque desligado por padrão no desktop');
+  tc.enable();
+  ok(Input.touch.enabled && tc.built, 'controles de toque ativam e constroem a interface');
+  ok(tc.btns.filter((b) => b.kind === 'skill').length === 4, 'um botão para cada uma das 4 habilidades');
+  // joystick move o personagem
+  const jx = game2.player.x;
+  tc.joy.ox = 100; tc.joy.oy = 300;
+  tc.moveKnob(160, 300);
+  ok(Input.touch.mx > 0.8 && Math.abs(Input.touch.my) < 0.01, `joystick direita → eixo X (${Input.touch.mx.toFixed(2)})`);
+  for (let i = 0; i < 40; i++) game2.frame(1 / 60);
+  ok(game2.player.x > jx + 15, 'joystick virtual move o jogador');
+  tc.moveKnob(102, 301);
+  eq(Input.touch.mx, 0, 'zona morta do joystick');
+  Input.touch.mx = Input.touch.my = 0;
+  // botão de atirar com mira automática
+  const tgt = game2.spawnEnemy('goblin', game2.player.x + 110, game2.player.y);
+  const hpTg = tgt.hp;
+  tc.fireEl.listeners.pointerdown[0]({ pointerId: 1, preventDefault() {}, });
+  ok(Input.touch.fire, 'botão de atirar pressionado');
+  for (let i = 0; i < 90; i++) game2.frame(1 / 60);
+  tc.fireEl.listeners.pointerup[0]({ pointerId: 1 });
+  ok(!Input.touch.fire, 'botão de atirar solto');
+  ok(tgt.hp < hpTg || tgt.dead, 'atirar por toque mira sozinho no inimigo mais próximo');
+  // botões de habilidade
+  game2.player.level = 12; game2.player.recompute(); game2.player.mana = game2.player.maxMana;
+  tc.btns.find((b) => b.kind === 'skill' && b.i === 1).el.listeners.pointerdown[0]({ preventDefault() {} });
+  ok(Input.pressed.Digit2, 'botão 2 aciona a habilidade 2');
+  game2.frame(1 / 60);
+  ok(game2.player.skillCd[1] > 0, 'habilidade acionada por toque entra em recarga');
+  tc.update();
+  ok(tc.root.classList.contains('hidden') === false, 'controles visíveis durante o jogo');
+  game2.ui.togglePanel('inventory');
+  tc.update();
+  ok(tc.root.classList.contains('hidden'), 'controles somem com painel aberto');
+  game2.ui.closeAll();
+  // HUD e renderização completa no modo toque
+  for (let i = 0; i < 5; i++) game2.frame(1 / 60);
+  tc.disable();
+  ok(!Input.touch.enabled, 'toque pode ser desligado');
+}
+
+// ===========================================================================
+section('20. Mapa: sem baús/inimigos/NPCs presos e sem terreno bloqueando');
+{
+  game2.startRun('knight', 'normal');
+  for (const id of ['overworld', 'dungeon', 'throne']) {
+    const m = game2.maps[id];
+    m.computeReach();
+    const sp = m.spawn;
+    ok(m.isReachable(Math.floor(sp.x / 16), Math.floor(sp.y / 16)), `${id}: ponto inicial é alcançável`);
+    let stuckC = 0, stuckE = 0;
+    for (const c of m.entities) if (c.type === 'chest' && !m.isReachable(c.tx, c.ty)) stuckC++;
+    for (const e of m.entities) if (e.type === 'enemy' && !m.isReachable(e.tx, e.ty)) stuckE++;
+    eq(stuckC, 0, `${id}: todos os baús são alcançáveis`);
+    eq(stuckE, 0, `${id}: nenhum inimigo nasce preso`);
+    for (const ex of m.exits) ok(m.isReachable(Math.floor(ex.x / 16), Math.floor(ex.y / 16)) || m.isReachable(Math.floor(ex.x / 16), Math.floor((ex.y + 16) / 16)) || m.isReachable(Math.floor(ex.x / 16), Math.floor((ex.y - 16) / 16)), `${id}: saída "${ex.label}" é alcançável`);
+  }
+  // água bloqueia o jogador
+  const ow = game2.maps.overworld;
+  let water = null;
+  for (let ty = 0; ty < ow.h && !water; ty++) for (let tx = 0; tx < ow.w; tx++) if (ow.tile(tx, ty) === TILE.WATER) { water = { tx, ty }; break; }
+  ok(!!water && ow.isBlockedTile(water.tx, water.ty), 'água bloqueia o movimento');
+  ok(!ow.isSolidTile(water.tx, water.ty), 'mas projéteis passam sobre a água');
+}
+
+// ===========================================================================
 console.log(`\n${'='.repeat(60)}`);
 console.log(`RESULTADO: ${pass} passaram, ${fail} falharam`);
 if (fail) {

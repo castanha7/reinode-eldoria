@@ -173,6 +173,7 @@ export class TouchControls {
 
     // atacar (segurar; arraste para mirar)
     const fire = mk('tc-fire', FIRE, fr, fb, '<span>⚔</span>');
+    this.fireEl = fire;
     fire.addEventListener('pointerdown', (e) => {
       if (this.fireId !== null) return;
       this.fireId = e.pointerId;
@@ -243,7 +244,7 @@ export class TouchControls {
 
   layout() {
     // posições calculadas em px; reposiciona se a orientação mudar
-    this.actions.style.setProperty('--tcs', String(this.scale()));
+    if (this.actions.style.setProperty) this.actions.style.setProperty('--tcs', String(this.scale()));
   }
 
   /** Chamado todo frame: mostra/esconde e atualiza recarga das habilidades. */
