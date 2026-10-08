@@ -26,7 +26,7 @@ Abra `http://localhost:8080` e escolha uma classe.
 | Modo | Regras |
 |------|--------|
 | **Aventura** | Vidas ilimitadas. Ao cair você acorda na cidade e perde 15% do ouro. |
-| **Clássico** | **3 vidas** para zerar o jogo (máx. 5 com a *Pena da Fênix*). Zerou as vidas = fim de jogo e o save é apagado. Inimigos e recompensas 10% maiores. |
+| **Clássico** | **3 vidas** para zerar o jogo (máx. 5 com a *Pena da Fênix*). Zerou as vidas = fim de jogo e o save é apagado. Inimigos 10% mais fortes e recompensas 10% maiores. |
 | **Hardcore** | **Uma única chance.** Inimigos com +40% de vida e +35% de dano, regeneração reduzida. Morreu = save apagado. |
 
 Concluir a missão final (derrotar o Guardião) é a **vitória**: o troféu do modo/classe fica
