@@ -222,6 +222,7 @@ export class UI {
         break;
       }
       case 'buy-potion': {
+        if (!CONSUMABLES.some((x) => x.id === node.dataset.id)) break;
         const c = consumable(node.dataset.id);
         if (g.player.gold < c.price) { g.notify('Ouro insuficiente.', '#ff8a8a'); sfx('deny'); break; }
         if (!g.player.addItem(c)) { g.notify('Inventário cheio!', '#ff8a8a'); sfx('deny'); break; }
@@ -322,10 +323,20 @@ export class UI {
       case 'tab-inv': this.togglePanel('inventory'); break;
       case 'tab-quests': this.togglePanel('quests'); break;
       case 'tab-help': this.togglePanel('help'); break;
-      case 'restart':
+      case 'restart': {
+        // confirmação em dois cliques: abandonar apaga o progresso salvo
+        if (!this.confirmRestart) {
+          this.confirmRestart = true;
+          node.textContent = 'Clique de novo para apagar o progresso';
+          setTimeout(() => { this.confirmRestart = false; node.textContent = 'Abandonar partida'; }, 3500);
+          break;
+        }
+        this.confirmRestart = false;
+        node.textContent = 'Abandonar partida';
         this.game.wipeSave();
-        location.reload();
+        this.game.toTitle();
         break;
+      }
       default:
         break;
     }

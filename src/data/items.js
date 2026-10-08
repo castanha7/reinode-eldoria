@@ -273,7 +273,8 @@ export function instantiate(base, regionTier = 1) {
 }
 
 export function consumable(id) {
-  const base = CONSUMABLES.find((c) => c.id === id) || CONSUMABLES[0];
+  const base = CONSUMABLES.find((c) => c.id === id);
+  if (!base) throw new Error(`Consumível desconhecido: ${id}`);
   return { ...base, uid: uid() };
 }
 

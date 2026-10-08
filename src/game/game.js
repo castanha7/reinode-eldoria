@@ -253,6 +253,7 @@ export class Game {
 
     // zona atual
     const z = this.map.zoneAt(p.x, p.y);
+    this.ambientFx(dt, z);
     const zn = z ? z.name : this.map.name;
     if (zn !== this.zoneName) {
       this.zoneName = zn;
@@ -700,7 +701,15 @@ export class Game {
     this.particles.draw(ctx, cam);
 
     // mira
-    if (!this.uiBlocking()) {
+    if (!this.uiBlocking() && Input.touch.enabled) {
+      const tg = this.nearestEnemy(this.player.x, this.player.y, 300 + (this.player.stats.range || 0) * 0.5);
+      if (tg) {
+        ctx.save();
+        ctx.strokeStyle = '#ff6a6a'; ctx.globalAlpha = 0.6 + Math.sin(this.time * 8) * 0.2; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.arc(tg.x, tg.y - tg.radius, tg.radius + 5, 0, Math.PI * 2); ctx.stroke();
+        ctx.restore();
+      }
+    } else if (!this.uiBlocking()) {
       const mw = this.mouseWorld;
       ctx.save();
       ctx.globalAlpha = 0.55;
@@ -723,6 +732,45 @@ export class Game {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.imageSmoothingEnabled = false;
     if (this.state !== 'title') drawHud(ctx, this);
+  }
+
+  /** Partículas ambientes por região: vagalumes, pólen, brasas, poeira. */
+  ambientFx(dt, zone) {
+    this.ambT = (this.ambT || 0) + dt;
+    const cam = this.camera;
+    const id = zone ? zone.id : '';
+    let kind = null;
+    if (this.map.id === 'dungeon') kind = 'dust';
+    else if (this.map.id === 'throne') kind = 'glow';
+    else if (['forest', 'deepforest', 'lake', 'lair_spider'].includes(id)) kind = 'firefly';
+    else if (['valley', 'lair_titan', 'lair_lich', 'ruins'].includes(id)) kind = 'ember';
+    else if (['fields', 'farmroad', 'city', 'northroad'].includes(id)) kind = 'petal';
+    else if (id === 'mountains') kind = 'dust';
+    if (!kind || this.particles.list.length > 420) return;
+    const rate = kind === 'firefly' ? 9 : 6;
+    let n = this.ambT * rate;
+    if (n < 1) return;
+    this.ambT = 0;
+    for (; n >= 1; n--) {
+      const x = cam.left + Math.random() * (cam.right - cam.left);
+      const y = cam.top + Math.random() * (cam.bottom - cam.top);
+      switch (kind) {
+        case 'firefly':
+          this.particles.spawn({ x, y, vx: (Math.random() - 0.5) * 14, vy: (Math.random() - 0.5) * 10, life: 2.6 + Math.random() * 2, size: 2, color: '#d6ff5a', color2: '#fff7b0', kind: 'circle', drag: 0.4 });
+          break;
+        case 'ember':
+          this.particles.spawn({ x, y: cam.bottom - Math.random() * 30, vx: (Math.random() - 0.5) * 16, vy: -14 - Math.random() * 18, life: 2.2 + Math.random() * 1.6, size: 2, color: '#ffb02a', color2: '#ff5a1a', drag: 0.2 });
+          break;
+        case 'petal':
+          this.particles.spawn({ x: cam.left - 6, y, vx: 14 + Math.random() * 12, vy: 3 + Math.random() * 8, life: 6, size: 1, color: ['#fff0a8', '#ffd0e8', '#ffffff'][(Math.random() * 3) | 0], drag: 0.05, grav: 0.5 });
+          break;
+        case 'glow':
+          this.particles.spawn({ x, y, vx: 0, vy: -6, life: 3, size: 1, color: '#ffe9a8', color2: '#b8a0ff', drag: 0.3 });
+          break;
+        default:
+          this.particles.spawn({ x, y, vx: (Math.random() - 0.5) * 6, vy: (Math.random() - 0.5) * 6, life: 3, size: 1, color: '#bba8e8', color2: '#6a5a98', drag: 0.3 });
+      }
+    }
   }
 
   drawLighting(ctx, cam) {
