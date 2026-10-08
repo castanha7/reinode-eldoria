@@ -69,6 +69,75 @@ export const ENEMIES = {
     drops: [{ id: 'potion_hp_big', chance: 0.15 }],
     blurb: 'Mais rápido que você. Não corra em linha reta.',
   },
+  bat: {
+    id: 'bat', name: 'Morcego das Sombras', hp: 22, dmg: 7, def: 0, speed: 118, xp: 14, gold: [2, 6],
+    radius: 6, sprite: 'bat', frames: 4, ai: 'chaser', tier: 1, color: '#7a5ab8', flyer: true, erratic: true,
+    attack: { range: 14, cd: 0.9, windup: 0.2 }, drops: [{ id: 'ration', chance: 0.1 }],
+    blurb: 'Rápido e imprevisível. Voa em zigue-zague.',
+  },
+  boar: {
+    id: 'boar', name: 'Javali Selvagem', hp: 64, dmg: 14, def: 3, speed: 96, xp: 26, gold: [4, 10],
+    radius: 9, sprite: 'boar', frames: 4, ai: 'charger', tier: 2, color: '#8a5a3a',
+    attack: { range: 18, cd: 1.9, windup: 0.55, dashSpeed: 330, dashTime: 0.45 },
+    drops: [{ id: 'ration', chance: 0.25 }],
+    blurb: 'Abaixa a cabeça e investe. Desvie no último segundo.',
+  },
+  bandit: {
+    id: 'bandit', name: 'Bandido', hp: 58, dmg: 12, def: 2, speed: 92, xp: 30, gold: [14, 32],
+    radius: 8, sprite: 'bandit', frames: 4, ai: 'chaser', tier: 2, color: '#9a4a3a', thief: true,
+    attack: { range: 18, cd: 1.0, windup: 0.26 }, drops: [{ id: 'potion_hp', chance: 0.18 }, { id: 'scroll_return', chance: 0.06 }],
+    blurb: 'Rouba ouro a cada golpe que acerta. Mate-o para recuperar.',
+  },
+  spider: {
+    id: 'spider', name: 'Aranha Venenosa', hp: 44, dmg: 10, def: 1, speed: 74, xp: 28, gold: [5, 12],
+    radius: 8, sprite: 'spider', frames: 4, ai: 'ranged', tier: 2, color: '#6a3a8a', webs: true,
+    attack: { range: 190, cd: 2.0, windup: 0.5, projSpeed: 210, minRange: 60 },
+    drops: [{ id: 'potion_mana', chance: 0.12 }, { id: 'elixir_swift', chance: 0.04 }],
+    blurb: 'Cospe teia que deixa você lento. Aproxime-se rápido.',
+  },
+  cultist: {
+    id: 'cultist', name: 'Cultista Sombrio', hp: 72, dmg: 17, def: 3, speed: 70, xp: 48, gold: [16, 34],
+    radius: 8, sprite: 'cultist', frames: 4, ai: 'ranged', tier: 3, color: '#8a3ab8', caster: true,
+    attack: { range: 240, cd: 2.2, windup: 0.6, projSpeed: 200, minRange: 100 },
+    drops: [{ id: 'potion_mana_big', chance: 0.15 }, { id: 'scroll_thunder', chance: 0.08 }],
+    blurb: 'Lança orbes de energia sombria. Frágil de perto.',
+  },
+  wraith: {
+    id: 'wraith', name: 'Espectro', hp: 88, dmg: 19, def: 2, speed: 100, xp: 58, gold: [12, 28],
+    radius: 8, sprite: 'wraith', frames: 4, ai: 'chaser', tier: 3, color: '#7ad6c8', ghost: true, drain: true,
+    attack: { range: 20, cd: 1.1, windup: 0.3 }, drops: [{ id: 'elixir_fortune', chance: 0.05 }, { id: 'potion_mana', chance: 0.15 }],
+    blurb: 'Sopra a vida dos vivos. Atravessa árvores e pedras.',
+  },
+  golem: {
+    id: 'golem', name: 'Golem de Pedra', hp: 210, dmg: 28, def: 14, speed: 40, xp: 96, gold: [24, 48],
+    radius: 12, sprite: 'golem', frames: 4, ai: 'brute', tier: 4, color: '#8a8a7a',
+    attack: { range: 36, cd: 2.2, windup: 0.8, knock: 220 }, drops: [{ id: 'elixir_guard', chance: 0.12 }, { id: 'potion_hp_big', chance: 0.15 }],
+    blurb: 'Pesado e quase imune a golpes leves. Bata forte.',
+  },
+  spider_queen: {
+    id: 'spider_queen', name: 'Vyrka, a Rainha Aranha', hp: 1050, dmg: 30, def: 8, speed: 72, xp: 700, gold: [260, 380],
+    radius: 20, sprite: 'spider_queen', frames: 4, ai: 'boss', bossKind: 'spider', tier: 5, color: '#b04ac8', boss: true,
+    attack: { range: 52, cd: 1.5, windup: 0.55, knock: 240 },
+    drops: [{ id: 'potion_hp_super', chance: 1 }, { id: 'elixir_regen', chance: 0.6 }],
+    blurb: 'Tece teias na Floresta Profunda. Suas crias nunca param.',
+    phaseNames: ['Vyrka rosna!', 'Vyrka se enfurece!'],
+  },
+  lich: {
+    id: 'lich', name: 'Maldrak, o Rei Esquelético', hp: 1400, dmg: 36, def: 10, speed: 58, xp: 900, gold: [320, 480],
+    radius: 18, sprite: 'lich', frames: 4, ai: 'boss', bossKind: 'lich', tier: 5, color: '#5ad8c0', boss: true,
+    attack: { range: 56, cd: 1.7, windup: 0.6, knock: 260 },
+    drops: [{ id: 'potion_hp_super', chance: 1 }, { id: 'scroll_thunder', chance: 0.8 }],
+    blurb: 'Reinava nas Ruínas antes do reino existir. Ainda reina.',
+    phaseNames: ['Maldrak invoca os mortos!', 'Maldrak libera seu poder final!'],
+  },
+  titan: {
+    id: 'titan', name: 'Grommash, o Colosso de Pedra', hp: 1900, dmg: 46, def: 18, speed: 50, xp: 1200, gold: [450, 650],
+    radius: 24, sprite: 'titan', frames: 4, ai: 'boss', bossKind: 'titan', tier: 5, color: '#d8a24a', boss: true,
+    attack: { range: 66, cd: 1.9, windup: 0.85, knock: 340 },
+    drops: [{ id: 'potion_hp_super', chance: 1 }, { id: 'elixir_guard', chance: 0.8 }],
+    blurb: 'Uma montanha que aprendeu a andar. Pisa forte, cai devagar.',
+    phaseNames: ['Grommash racha ao meio!', 'Grommash desperta o núcleo de lava!'],
+  },
   elite: {
     id: 'elite', name: 'Chefe Orc Ghorruk', hp: 340, dmg: 32, def: 8, speed: 66, xp: 220, gold: [80, 140],
     radius: 13, sprite: 'elite', frames: 4, ai: 'brute', tier: 4, color: '#c94a4a', elite: true,
@@ -91,25 +160,25 @@ export function enemyDef(id) {
 /** Inimigos que aparecem em cada região (id, peso). */
 export const REGION_SPAWNS = {
   fields: [
-    ['slime', 6], ['slime', 4], ['goblin', 3],
+    ['slime', 6], ['slime', 4], ['goblin', 3], ['boar', 3], ['bat', 2], ['bandit', 1],
   ],
   forest: [
-    ['goblin', 5], ['wolf', 4], ['slime', 3], ['skeleton', 2],
+    ['goblin', 5], ['wolf', 4], ['slime', 3], ['skeleton', 2], ['bat', 3], ['spider', 3], ['boar', 2], ['bandit', 2],
   ],
   deepforest: [
-    ['wolf', 5], ['goblin', 4], ['direwolf', 3], ['skeleton', 3],
+    ['wolf', 5], ['goblin', 4], ['direwolf', 3], ['skeleton', 3], ['spider', 5], ['bat', 3], ['cultist', 1],
   ],
   ruins: [
-    ['skeleton', 6], ['skeleton', 3], ['soldier_sword', 3], ['orc', 2],
+    ['skeleton', 6], ['skeleton', 3], ['soldier_sword', 3], ['orc', 2], ['wraith', 3], ['cultist', 2], ['golem', 1],
   ],
   road: [
-    ['soldier_sword', 5], ['soldier_archer', 4], ['soldier_heavy', 2],
+    ['soldier_sword', 5], ['soldier_archer', 4], ['soldier_heavy', 2], ['bandit', 4], ['boar', 1],
   ],
   valley: [
-    ['orc', 5], ['direwolf', 4], ['soldier_heavy', 3], ['soldier_archer', 3],
+    ['orc', 5], ['direwolf', 4], ['soldier_heavy', 3], ['soldier_archer', 3], ['golem', 2], ['cultist', 3], ['wraith', 2], ['spider', 2],
   ],
   dungeon: [
-    ['skeleton', 4], ['orc', 4], ['slime', 2], ['soldier_heavy', 2],
+    ['skeleton', 4], ['orc', 4], ['slime', 2], ['soldier_heavy', 2], ['bat', 3], ['wraith', 2], ['golem', 1], ['cultist', 2],
   ],
   bossroom: [],
 };

@@ -11,7 +11,7 @@ export const NPC_DEFS = {
       'E, como se não bastasse, algo despertou sob a Caverna Esquecida, ao norte.',
       'Preciso de alguém que não deva nada a ninguém. Preciso de você.',
     ],
-    quests: ['q_slimes', 'q_forest', 'q_traitors', 'q_boss'],
+    quests: ['q_slimes', 'q_forest', 'q_traitors', 'q_boss', 'q_spider', 'q_lich', 'q_titan'],
   },
   advisor: {
     sprite: 'elder', name: 'Conselheiro Otho', title: 'Conselheiro Real', role: 'talk',
@@ -70,7 +70,7 @@ export const NPC_DEFS = {
     ],
   },
   guard_east: {
-    sprite: 'guard', name: 'Capitão Dorn', title: 'Capitão da Guarda', role: 'talk',
+    sprite: 'guard', name: 'Capitão Dorn', title: 'Capitão da Guarda', role: 'quest', quests: ['q_bandits', 'q_golems'],
     dialog: [
       'O portão leste dá para os campos e, mais adiante, para as Ruínas Antigas.',
       'Nas ruínas tem esqueleto. Muito esqueleto. Leve algo que bata forte.',
@@ -137,11 +137,80 @@ export const NPC_DEFS = {
     ],
   },
   hunter: {
-    sprite: 'villager_f', name: 'Caçadora Yara', title: 'Caçadora', role: 'talk',
+    sprite: 'huntress', name: 'Caçadora Yara', title: 'Caçadora', role: 'quest', quests: ['q_spiders'],
     dialog: [
       'Shhh. Lobos. Eles preparam o bote antes de atacar — se você vir o agachamento, saia da frente.',
       'Na Floresta Profunda tem lobos sombrios. Esses não agacham, eles simplesmente aparecem.',
       'Leve poções. Todo mundo diz isso. Ninguém leva.',
+    ],
+  },
+  alchemist: {
+    sprite: 'alchemist', name: 'Mestra Lyra', title: 'Alquimista', role: 'alchemist',
+    dialog: [
+      'Cuidado com o frasco verde. Não, o outro verde. Esse também.',
+      'Elixires, poções, pergaminhos... tudo testado. Em mim, na maioria dos casos.',
+      'Um elixir bem usado vale mais que uma armadura nova. Guarde os fortes para os chefes.',
+    ],
+  },
+  bard: {
+    sprite: 'bard', name: 'Fino, o Trovador', title: 'Bardo Errante', role: 'bard', wander: 40,
+    dialog: [
+      'Ah, um herói! Posso fazer uma canção sobre você? Só preciso de uma coisinha: ouro.',
+      'Minhas canções dão coragem de verdade. Pergunte a quem sobreviveu a elas.',
+    ],
+  },
+  fisher: {
+    sprite: 'fisher', name: 'Pescador Bento', title: 'Pescador', role: 'talk',
+    dialog: [
+      'Pesco aqui há trinta anos. Nunca peguei nada. Mas o silêncio é bom.',
+      'O rio corta o reino ao meio. Só atravesse pelas pontes — a água é funda e fria.',
+      'Dizem que há um esconderijo escondido bem pertinho do rio, ao norte da cidade.',
+    ],
+  },
+  miner: {
+    sprite: 'miner', name: 'Durgan, o Mineiro', title: 'Mineiro', role: 'talk',
+    dialog: [
+      'Eu cavava ali embaixo até o chão tremer. Agora fico aqui, olhando a entrada e tremendo também.',
+      'A Caverna Esquecida tem salas com baús e esqueletos. E, no fundo, algo que ruge.',
+      'Golems de pedra andam por aí. Duros demais para facas finas. Arma pesada neles.',
+    ],
+  },
+  hermit: {
+    sprite: 'hermit', name: 'Eremita Zephyr', title: 'Mago Recluso', role: 'talk',
+    dialog: [
+      'Shhh. Estou escutando as pedras. Elas falam. Pouco, mas falam.',
+      'A Clareira Esquecida esconde uma entrada atrás dos arbustos. Mas você não ouviu isso de mim.',
+      'Há três senhores nas terras: uma aranha, um rei morto e uma montanha. Todos têm tesouros.',
+    ],
+  },
+  traveler: {
+    sprite: 'traveler', name: 'Viajante Kael', title: 'Viajante', role: 'talk', wander: 36,
+    dialog: [
+      'Vim de longe. Longe de verdade. Nunca vi tanto monstro por metro quadrado.',
+      'Se encontrar um bandido, não deixe ele te tocar: ele rouba ouro e foge.',
+      'Pergaminhos de Retorno salvam vidas. Compre um antes de entrar em qualquer buraco.',
+    ],
+  },
+  dog: {
+    sprite: 'dog', name: 'Cachorro Caramelo', title: 'Vira-lata', role: 'pet', wander: 48,
+    dialog: ['Au! Au!', '*abana o rabo animadamente*'],
+  },
+  cat: {
+    sprite: 'cat', name: 'Gato Mingau', title: 'Gato da Praça', role: 'pet', wander: 30,
+    dialog: ['Miau.', '*olha para você com desdém e volta a lamber a pata*'],
+  },
+  villager_5: {
+    sprite: 'villager_f', name: 'Tia Beatriz', title: 'Padeira', role: 'talk', wander: 30,
+    dialog: [
+      'Pão quentinho! Ou quase quente. Ou pão.',
+      'Meu marido foi caçar lobos. Voltou com um javali. Não perguntem.',
+    ],
+  },
+  villager_6: {
+    sprite: 'villager_m', name: 'Dedo', title: 'Aprendiz de Ferreiro', role: 'talk', wander: 28,
+    dialog: [
+      'Bram me deixa bater no ferro frio. É uma honra. Dizem.',
+      'Se reforjar a arma várias vezes, ela fica monstruosa. Ouro bem gasto.',
     ],
   },
 };

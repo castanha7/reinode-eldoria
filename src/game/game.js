@@ -13,13 +13,16 @@ import { Camera } from '../core/camera.js';
 import { Input } from '../core/input.js';
 import { sfx as playSfx } from '../core/audio.js';
 import { enemyDef, pickSpawn, REGION_SPAWNS } from '../data/enemies.js';
-import { QUESTS, questById, enemyTags } from '../data/quests.js';
+import { QUESTS, questById, enemyTags, questUnlocked } from '../data/quests.js';
+import { MODES, modeById, MAX_LIVES, FINAL_QUEST } from '../data/modes.js';
 import { rollEquipment, consumable, shopStock, instantiate } from '../data/items.js';
 import { drawHud, drawMinimap } from '../ui/hud.js';
 import { S } from '../sprites.js';
 import { clamp } from '../core/utils.js';
 
 const SAVE_KEY = 'eldoria_save_v1';
+const SAVE_VERSION = 2;
+export const TROPHY_KEY = 'eldoria_trophies';
 
 export class Game {
   constructor(canvas, ui) {
@@ -48,6 +51,11 @@ export class Game {
     this.boss = null;
     this.spawnTimer = 1;
     this.stats = { kills: 0, chests: 0, gold: 0, time: 0, deaths: 0 };
+    this.mode = 'normal';
+    this.won = false;
+    this.quests = {};
+    this.killedStatics = new Set();
+    this.openedChests = new Set();
     this.ui.setGame(this);
   }
 
@@ -94,8 +102,17 @@ export class Game {
     }
   }
 
-  startRun(classId) {
+  startRun(classId, mode = 'normal') {
+    this.mode = MODES[mode] ? mode : 'normal';
+    this.won = false;
+    this.killedStatics = new Set();
+    this.openedChests = new Set();
+    // mapas novos: inimigos, baús e chefes recomeçam do zero a cada nova aventura
+    this.buildMaps();
     this.player = new Player(classId);
+    const M = modeById(this.mode);
+    this.player.maxLives = M.lives === Infinity ? 0 : M.lives;
+    this.player.lives = this.player.maxLives;
     const sp = this.maps.overworld.spawn;
     this.player.x = sp.x;
     this.player.y = sp.y;
@@ -112,9 +129,20 @@ export class Game {
     this.loadMap('overworld', sp, true);
     this.state = 'playing';
     this.ui.closeAll();
+    this.ui.hideDeath();
     this.notify(`${this.player.cls.name} — ${this.player.cls.tagline}`, this.player.cls.color);
-    this.notify('WASD move • Mouse mira e ataca • 1/2/3 habilidades • E interage • I inventário', '#c9c9d4');
+    if (this.mode !== 'normal') this.notify(`Modo ${M.name}: ${M.lives === 1 ? 'uma única vida!' : M.lives + ' vidas.'}`, M.color);
+    this.notify(Input.touch.enabled ? 'Joystick move • ⚔ ataca (auto-mira) • botões: habilidades, esquiva, interagir' : 'WASD move • Mouse mira e ataca • 1-4 habilidades • Espaço esquiva • E interage • I inventário', '#c9c9d4');
+    this.save();
   }
+
+  /** Multiplicadores de dificuldade do modo atual. */
+  enemyMul() {
+    const M = modeById(this.mode);
+    return { hp: M.hp, dmg: M.dmg };
+  }
+  regenMul() { return modeById(this.mode).regen; }
+  rewardMul() { return modeById(this.mode).reward; }
 
   loadMap(id, pos, snap) {
     const map = this.maps[id];
@@ -128,12 +156,15 @@ export class Game {
         if (e.type === 'npc') data.npcs.push(new Npc(e.npcId, x, y, e.face || 0));
         else if (e.type === 'chest') {
           const c = new Chest(x, y, e.tier, { secret: e.secret, bossChest: e.bossChest });
-          c.key = `${id}:${e.tx},${e.ty}`;
+          c.key = `${id}:${e.origTx !== undefined ? e.origTx : e.tx},${e.origTy !== undefined ? e.origTy : e.ty}`;
+          c.opened = this.openedChests.has(c.key);
           data.chests.push(c);
         } else if (e.type === 'enemy') {
-          const en = new Enemy(e.enemy, x, y, { hpMul: 1, dmgMul: 1 });
+          const mul = this.enemyMul();
+          const en = new Enemy(e.enemy, x, y, { hpMul: mul.hp, dmgMul: mul.dmg });
           en.mapId = id;
           en.static = true;
+          if (this.killedStatics.has(`${id}:${e.enemy}:${Math.round(en.homeX)},${Math.round(en.homeY)}`)) continue; // já derrotado
           data.enemies.push(en);
         }
       }
@@ -150,6 +181,8 @@ export class Game {
     }
     this.camera.snap(this.player.x, this.player.y, { w: map.pxW, h: map.pxH });
     this.boss = null;
+    // chefes que perderam o jogador voltam à vida cheia e ao ponto de origem
+    for (const o of this.enemies) if (o.isBoss && !o.dead && o.mapId !== undefined) o.resetFight();
     this.ui.setMapName(map.name);
   }
 
@@ -159,8 +192,13 @@ export class Game {
   frame(dt) {
     this.time += dt;
     if (this.state === 'playing') {
-      this.stats.time += dt;
-      this.updatePlaying(dt);
+      // com painéis abertos (inventário, loja, diálogo...) o mundo fica congelado
+      if (!this.ui.blocking) {
+        this.stats.time += dt;
+        this.updatePlaying(dt);
+      } else {
+        this.frozenT = (this.frozenT || 0) + dt;
+      }
     } else if (this.state === 'title' && this.map) {
       this.camera.x += 9 * dt;
       if (this.camera.x > this.map.pxW - this.camera.vw) this.camera.x = 0;
@@ -173,10 +211,8 @@ export class Game {
   updatePlaying(dt) {
     const p = this.player;
     p.update(dt, this);
-    if (p.dead) {
-      p.respawnT -= 0;
-      if (p.respawnT <= 0) this.respawnPlayer();
-    }
+    // (a morte aguarda o jogador no painel: botão "Acordar na cidade" / Enter)
+    if (p.dead && (Input.hit('Enter') || Input.hit('Space')) && this.ui.canRespawn()) this.respawnPlayer();
 
     for (const e of this.enemies) e.update(dt, this);
     for (let i = this.enemies.length - 1; i >= 0; i--) {
@@ -222,7 +258,7 @@ export class Game {
       if (z && z.secret) this.notify(`Área secreta descoberta: ${z.name}!`, '#b875f0');
     }
 
-    this.boss = this.enemies.find((e) => e.isBoss && !e.dead) || null;
+    this.boss = this.enemies.find((e) => e.isBoss && !e.dead && (Math.hypot(e.x - p.x, e.y - p.y) < 380 || e.state === 'chase' && Math.hypot(e.x - p.x, e.y - p.y) < 700)) || null;
 
     // spawn dinâmico no mundo aberto
     if (this.map.id === 'overworld') this.dynamicSpawn(dt);
@@ -236,14 +272,15 @@ export class Game {
     if (this.spawnTimer > 0) return;
     this.spawnTimer = 1.6;
     const cap = 26;
-    if (this.enemies.length >= cap) return;
+    // só conta os inimigos "soltos" (os fixos de chefes/elites não ocupam vagas)
+    if (this.enemies.reduce((n, e) => n + (!e.dead && !e.static ? 1 : 0), 0) >= cap) return;
     const zones = this.map.spawnZones || [];
     if (!zones.length) return;
     const z = zones[(Math.random() * zones.length) | 0];
     for (let attempt = 0; attempt < 14; attempt++) {
       const tx = z.x + ((Math.random() * z.w) | 0);
       const ty = z.y + ((Math.random() * z.h) | 0);
-      if (this.map.isSolidTile(tx, ty)) continue;
+      if (!this.map.isOpenSpot(tx, ty) || this.map.isSafeAt(tx * TS + 8, ty * TS + 8) || this.map.isLairAt(tx * TS + 8, ty * TS + 8)) continue;
       const x = tx * TS + 8, y = ty * TS + 8;
       const d = Math.hypot(x - this.player.x, y - this.player.y);
       if (d < 300 || d > 900) continue;
@@ -255,8 +292,9 @@ export class Game {
 
   spawnEnemy(type, x, y, opts = {}) {
     const lvl = this.player ? this.player.level : 1;
-    const hpMul = (opts.hpMul || 1) * (1 + Math.max(0, lvl - 4) * 0.07);
-    const dmgMul = (opts.dmgMul || 1) * (1 + Math.max(0, lvl - 4) * 0.045);
+    const mul = this.enemyMul();
+    const hpMul = (opts.hpMul || 1) * mul.hp * (1 + Math.max(0, lvl - 4) * 0.07);
+    const dmgMul = (opts.dmgMul || 1) * mul.dmg * (1 + Math.max(0, lvl - 4) * 0.045);
     const e = new Enemy(type, x, y, { hpMul, dmgMul });
     e.mapId = this.map.id;
     this.enemies.push(e);
@@ -325,12 +363,18 @@ export class Game {
   }
 
   onEnemyKilled(e, from) {
+    if (e.static) this.killedStatics.add(`${e.mapId}:${e.type}:${Math.round(e.homeX)},${Math.round(e.homeY)}`);
     this.sfx('kill');
     this.stats.kills++;
     if (this.player) this.player.kills++;
     const lvl = this.player ? this.player.level : 1;
-    const xp = Math.round(e.d.xp * (1 + Math.max(0, lvl - 4) * 0.05));
-    const gold = Math.round((e.d.gold[0] + Math.random() * (e.d.gold[1] - e.d.gold[0])) * (1 + Math.max(0, lvl - 4) * 0.04));
+    const rm = this.rewardMul();
+    const xp = Math.round(e.d.xp * (1 + Math.max(0, lvl - 4) * 0.05) * rm);
+    let gold = Math.round((e.d.gold[0] + Math.random() * (e.d.gold[1] - e.d.gold[0])) * (1 + Math.max(0, lvl - 4) * 0.04) * rm * (1 + (this.player.stats.goldFind || 0)));
+    if (e.stolen) {
+      gold += e.stolen;
+      this.notify(`Você recuperou ${e.stolen} de ouro do ${e.d.name}.`, '#ffd85a');
+    }
     this.player.gainXp(xp, this);
     this.player.gold += gold;
     this.stats.gold += gold;
@@ -342,17 +386,22 @@ export class Game {
     // drops
     for (const drop of e.d.drops || []) {
       if (Math.random() < drop.chance) {
+        if (drop.id === 'phoenix_feather' && this.mode !== 'classic') continue;
         const it = consumable(drop.id);
-        if (this.player.addItem(it)) this.notify(`Saque: ${it.name}`, '#9ae8ff');
+        this.giveItem(it, null, `Saque: ${it.name}`);
       }
     }
     if (e.isElite || e.isBoss) {
       const tier = e.isBoss ? 4 : 3;
       const it = rollEquipment(Math.random, this.player.cls.id, tier);
-      if (this.player.addItem(it)) this.showLoot(it, e.isBoss ? 'Espólio do chefe' : 'Espólio de elite');
+      this.giveItem(it, e.isBoss ? 'Espólio do chefe' : 'Espólio de elite');
+      if (e.isBoss && this.mode === 'classic' && e.d.bossKind && Math.random() < 0.5) {
+        this.giveItem(consumable('phoenix_feather'), null, 'O chefe deixou uma Pena da Fênix!');
+      }
     }
     if (e.isBoss) {
       this.notify(`${e.d.name} foi derrotado!`, '#ffd85a');
+      if (e.d.bossKind) this.notify('Um baú se revelou no covil do chefe!', '#ffd85a');
       this.camera.kick(9, 1.2);
       this.particles.burst(e.x, e.y - 20, 70, { color: ['#b875f0', '#ffd85a', '#ffffff'], speed: 220, life: 1.4 });
       for (const c of this.chests) if (c.bossChest && !c.opened) this.notify('Um baú se revelou na sala do chefe!', '#ffd85a');
@@ -368,10 +417,15 @@ export class Game {
       if (!st || st.state !== 'active') continue;
       if (q.goal.type !== 'kill') continue;
       if (tags.indexOf(q.goal.tag) < 0) continue;
+      if (q.goal.zones) {
+        // só vale nas zonas indicadas (ex.: "nos Campos de Eldoria")
+        const z = this.map.id === 'overworld' ? this.map.zoneAt(e.x, e.y) : null;
+        if (!z || q.goal.zones.indexOf(z.id) < 0) continue;
+      }
       st.progress++;
       if (st.progress >= q.goal.count) {
         st.state = 'done';
-        this.notify(`Missão concluída: ${q.name} — fale com o Rei!`, '#ffd85a');
+        this.notify(`Missão concluída: ${q.name} — fale com ${this.giverName(q)}!`, '#ffd85a');
         this.sfx('quest');
       } else {
         this.notify(`${q.name}: ${st.progress}/${q.goal.count}`, '#c9c9d4');
@@ -389,15 +443,149 @@ export class Game {
     this.save();
   }
 
+  giverName(q) {
+    const names = { king: 'o Rei', guard_east: 'o Capitão Dorn', hunter: 'a Caçadora Yara' };
+    return names[q.giver] || 'o Rei';
+  }
+
   onPlayerDeath() {
     this.stats.deaths++;
+    const p = this.player;
+    if (this.mode !== 'normal') {
+      p.lives = Math.max(0, p.lives - 1);
+      if (p.lives <= 0) {
+        // fim de jogo: o progresso é apagado
+        this.state = 'gameover';
+        this.wipeSave();
+        this.ui.showGameOver();
+        return;
+      }
+    }
     this.ui.showDeath();
+    if (this.mode !== 'normal') this.save();
   }
 
   respawnPlayer() {
+    if (!this.player.dead || this.state !== 'playing') return;
     this.ui.hideDeath();
     this.player.respawn(this);
     this.save();
+  }
+
+  /** Volta ao título (após fim de jogo). */
+  toTitle() {
+    this.state = 'title';
+    this.ui.hideDeath();
+    this.ui.closeAll();
+    this.ui.buildTitle();
+    this.ui.showTitle();
+    this.map = this.maps.overworld;
+    this.mapData.overworld && this.loadMap('overworld', this.maps.overworld.spawn, true);
+  }
+
+  onVictory() {
+    if (this.won) return;
+    this.won = true;
+    const trophies = this.recordTrophy();
+    this.sfx('quest');
+    this.camera.kick(8, 1);
+    this.particles.burst(this.player.x, this.player.y - 14, 80, { color: ['#ffd85a', '#fff2c0', '#ffffff', '#b875f0'], speed: 240, life: 1.6 });
+    this.ui.showVictory(trophies);
+    this.save();
+  }
+
+  /** Registra a vitória nos troféus permanentes (por modo e classe). */
+  recordTrophy() {
+    let t = { clears: {}, classes: {}, bestTime: {} };
+    try { t = { ...t, ...JSON.parse(localStorage.getItem(TROPHY_KEY) || '{}') }; } catch (e) { /* ignora */ }
+    t.clears[this.mode] = (t.clears[this.mode] || 0) + 1;
+    const ck = `${this.mode}:${this.player.cls.id}`;
+    t.classes[ck] = (t.classes[ck] || 0) + 1;
+    const bt = t.bestTime[this.mode];
+    if (!bt || this.stats.time < bt) t.bestTime[this.mode] = Math.round(this.stats.time);
+    try { localStorage.setItem(TROPHY_KEY, JSON.stringify(t)); } catch (e) { /* ignora */ }
+    return t;
+  }
+
+  static trophies() {
+    try { return JSON.parse(localStorage.getItem(TROPHY_KEY) || '{}'); } catch (e) { return {}; }
+  }
+
+  // --- itens utilitários -------------------------------------------------------
+  /** Entrega um item; com a mochila cheia ele é vendido automaticamente (nunca se perde). */
+  giveItem(item, lootLabel, notifyText) {
+    const p = this.player;
+    if (p.addItem(item)) {
+      if (lootLabel && !item.kind) this.showLoot(item, lootLabel);
+      else if (lootLabel) this.showLoot(item, lootLabel);
+      if (notifyText) this.notify(notifyText, '#9ae8ff');
+      return true;
+    }
+    const gold = Math.max(1, Math.round((item.price || 20) * 0.4));
+    p.gold += gold;
+    this.stats.gold += gold;
+    this.notify(`Mochila cheia! ${item.name} foi vendido por ${gold} ouro.`, '#ffb86a');
+    return false;
+  }
+
+  nearestEnemy(x, y, range) {
+    let best = null, bd = range;
+    for (const e of this.enemies) {
+      if (e.dead || e.spawnT > 0) continue;
+      const d = Math.hypot(e.x - x, e.y - y);
+      if (d < bd && this.map.lineOfSight(x, y - 10, e.x, e.y - 8)) { bd = d; best = e; }
+    }
+    return best;
+  }
+
+  useFeather() {
+    const p = this.player;
+    if (this.mode !== 'classic') {
+      this.notify(this.mode === 'hardcore' ? 'No Hardcore não há segunda chance.' : 'A Pena da Fênix só funciona no modo Clássico.', '#c96a6a');
+      this.sfx('deny');
+      return false;
+    }
+    if (p.lives >= MAX_LIVES) {
+      this.notify(`Você já tem o máximo de vidas (${MAX_LIVES}).`, '#c96a6a');
+      this.sfx('deny');
+      return false;
+    }
+    p.lives++;
+    this.notify(`A Fênix renasce em você! Vidas: ${p.lives}`, '#ff8a3a');
+    this.particles.burst(p.x, p.y - 12, 40, { color: ['#ff8a3a', '#ffd85a', '#ffffff'], speed: 140, life: 1 });
+    this.addEffect({ sprite: 'fx:ring', frames: 5, x: p.x, y: p.y - 8, life: 0.7, scale: 2.4 });
+    return true;
+  }
+
+  townPortal() {
+    const p = this.player;
+    if (this.map.id === 'overworld' && Math.hypot(p.x - this.maps.overworld.spawn.x, p.y - this.maps.overworld.spawn.y) < 80) {
+      this.notify('Você já está na praça.', '#9a9ab0');
+      return false;
+    }
+    this.particles.burst(p.x, p.y - 8, 30, { color: ['#b8a0ff', '#ffffff'], speed: 120, life: 0.8 });
+    const sp = this.maps.overworld.spawn;
+    this.loadMap('overworld', { x: sp.x, y: sp.y });
+    this.particles.burst(p.x, p.y - 8, 30, { color: ['#b8a0ff', '#ffffff'], speed: 120, life: 0.8 });
+    this.notify('O pergaminho o levou de volta à praça.', '#b8a0ff');
+    return true;
+  }
+
+  castThunder() {
+    const p = this.player;
+    this.sfx('crit');
+    this.camera.kick(6, 0.4);
+    let n = 0;
+    for (const e of this.enemies) {
+      if (e.dead || Math.hypot(e.x - p.x, e.y - p.y) > 240) continue;
+      n++;
+      for (let k = 0; k < 6; k++) {
+        this.particles.spawn({ x: e.x + (Math.random() * 6 - 3), y: e.y - k * 9, life: 0.35, size: 4, color: k % 2 ? '#ffffff' : '#ffe36a', kind: 'fade', drag: 2 });
+      }
+      this.addEffect({ sprite: 'fx:boom', frames: 5, x: e.x, y: e.y - 6, life: 0.35, scale: 1 });
+      this.hitEnemy(e, p.stats.atk * 3.2, { from: p, crit: false, knock: 80, angle: Math.atan2(e.y - p.y, e.x - p.x), stun: 0.8 });
+    }
+    if (!n) this.notify('O trovão ecoa... mas não havia inimigos por perto.', '#9a9ab0');
   }
 
   inCombat(sec = 4) {
@@ -417,20 +605,25 @@ export class Game {
       }
     }
     for (const c of this.chests) {
-      if (c.near) { c.open(this); return; }
+      if (c.near && !c.opened) { c.open(this); return; }
     }
     let best = null, bd = 40;
     for (const n of this.npcs) {
       const d = Math.hypot(n.x - p.x, n.y - p.y);
       if (d < bd) { bd = d; best = n; }
     }
+    if (best && best.def.role === 'pet') {
+      this.float(best.x, best.y - 30, best.npcId === 'dog' ? 'Au! Au!' : 'Miau~', '#ffe9a0', 7);
+      this.sfx('ui');
+      return;
+    }
     if (best) { this.ui.openNpc(best); return; }
   }
 
   travel(ex) {
     this.sfx('ui');
-    if (ex.target === 'overworld' && ex.label === 'Saída') {
-      this.loadMap('overworld', ex.spawn);
+    if (ex.spawn) {
+      this.loadMap(ex.target, { x: ex.spawn.x, y: ex.spawn.y });
     } else {
       const target = this.maps[ex.target];
       this.loadMap(ex.target, { x: target.spawn.x, y: target.spawn.y });
@@ -465,9 +658,10 @@ export class Game {
     if (q.reward.item) {
       const tier = { rare: 2, epic: 3, legendary: 4 }[q.reward.item] || 1;
       const it = rollEquipment(Math.random, p.cls.id, tier);
-      if (p.addItem(it)) this.showLoot(it, 'Recompensa real');
+      this.giveItem(it, 'Recompensa');
     }
     this.sfx('quest');
+    if (q.id === FINAL_QUEST) this.onVictory();
   }
 
   // =========================================================================
@@ -580,18 +774,17 @@ export class Game {
   // save / load
   // =========================================================================
   save() {
-    if (!this.player || this.state === 'title') return;
+    if (!this.player || this.state === 'title' || this.state === 'gameover') return;
     try {
-      const opened = [];
-      for (const id of Object.keys(this.mapData)) {
-        for (const c of this.mapData[id].chests) if (c.opened && c.key) opened.push(c.key);
-      }
-      const deadStatics = [];
-      for (const id of Object.keys(this.mapData)) {
-        for (const e of this.mapData[id].enemies) if (e.static && e.dead) deadStatics.push(`${id}:${e.type}:${Math.round(e.homeX)},${Math.round(e.homeY)}`);
-      }
+      const opened = [...this.openedChests];
+      // inimigos fixos já derrotados (a lista persiste: o corpo some do mapa após a animação)
+      const deadStatics = [...this.killedStatics];
       const data = {
-        v: 1,
+        v: SAVE_VERSION,
+        mode: this.mode,
+        won: this.won,
+        lives: this.player.lives,
+        buffs: this.player.buffs,
         cls: this.player.cls.id,
         level: this.player.level,
         xp: this.player.xp,
@@ -623,12 +816,21 @@ export class Game {
     let data;
     try { data = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch (e) { return false; }
     if (!data) return false;
+    this.mode = MODES[data.mode] ? data.mode : 'normal';
+    this.won = !!data.won;
+    this.killedStatics = new Set(data.deadStatics || []);
+    this.openedChests = new Set(data.opened || []);
+    // reconstrói o mundo para não herdar estado de uma partida anterior
+    this.buildMaps();
     this.player = new Player(data.cls);
+    this.player.maxLives = modeById(this.mode).lives === Infinity ? 0 : modeById(this.mode).lives;
+    this.player.lives = this.player.maxLives ? Math.max(1, Math.min(MAX_LIVES, data.lives || this.player.maxLives)) : 0;
+    this.player.buffs = Array.isArray(data.buffs) ? data.buffs.filter((b) => b && b.time > 0) : [];
     this.player.level = data.level;
     this.player.xp = data.xp;
     this.player.gold = data.gold;
     this.player.equip = data.equip || { weapon: null, armor: null, trinket: null };
-    this.player.inventory = data.inventory || [];
+    this.player.inventory = (data.inventory || []).filter((it) => it && it.uid);
     this.player.weaponUpgrades = data.upgrades || 0;
     this.player.kills = data.kills || 0;
     this.player.chestsOpened = data.chestsOpened || 0;
@@ -639,25 +841,20 @@ export class Game {
     this.quests = data.quests || {};
     for (const q of QUESTS) if (!this.quests[q.id]) this.quests[q.id] = { state: 'available', progress: 0 };
     this.stats = data.stats || this.stats;
+    this.particles.clear();
+    this.floats.clear();
+    this.effects = [];
     this.enemies = [];
     this.projectiles = [];
-    this.loadMap(data.map || 'overworld', data.pos || this.maps.overworld.spawn, true);
-    // aplica estado de baús e inimigos estáticos
-    const opened = new Set(data.opened || []);
-    for (const id of Object.keys(this.mapData)) {
-      for (const c of this.mapData[id].chests) if (opened.has(c.key)) c.opened = true;
-    }
-    const dead = new Set(data.deadStatics || []);
-    for (const id of Object.keys(this.mapData)) {
-      for (const e of this.mapData[id].enemies) {
-        const k = `${id}:${e.type}:${Math.round(e.homeX)},${Math.round(e.homeY)}`;
-        if (dead.has(k)) { e.dead = true; e.deathT = 99; }
-      }
-    }
+    const mapId = this.maps[data.map] ? data.map : 'overworld';
+    let pos = data.pos || this.maps[mapId].spawn;
+    if (this.maps[mapId].isBlockedTile(Math.floor(pos.x / TS), Math.floor(pos.y / TS))) pos = this.maps[mapId].findFree(Math.floor(pos.x / TS), Math.floor(pos.y / TS), 10);
+    this.loadMap(mapId, pos, true);
     this.enemies = this.mapData[this.map.id].enemies.filter((e) => !e.dead);
     this.state = 'playing';
     this.ui.closeAll();
-    this.notify('Jogo carregado.', '#9ae8ff');
+    this.ui.hideDeath();
+    this.notify(`Jogo carregado — modo ${modeById(this.mode).name}${this.player.maxLives ? ` (${this.player.lives} vidas)` : ''}.`, '#9ae8ff');
     return true;
   }
 

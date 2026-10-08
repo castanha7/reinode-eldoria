@@ -40,8 +40,12 @@ export function castSkill(game, p, index, sk) {
 
     case 'beam': {
       sfx(P.sound);
-      const len = P.length * (1 + (p.stats.range - p.cls.stats.range) / 400);
       const dx = Math.cos(p.aimAngle), dy = Math.sin(p.aimAngle);
+      let len = P.length * (1 + (p.stats.range - p.cls.stats.range) / 400);
+      // o raio para na primeira parede/árvore (tile opaco)
+      for (let d = 6; d < len; d += 4) {
+        if (game.map.isOpaqueAt(p.x + dx * d, p.y - 10 + dy * d)) { len = d; break; }
+      }
       const hitIds = new Set();
       for (const e of game.enemies) {
         if (e.dead) continue;
@@ -51,8 +55,8 @@ export function castSkill(game, p, index, sk) {
         if (proj < 0 || proj > len) continue;
         const perp = Math.abs(ex * dy - ey * dx);
         if (perp > P.width + e.radius) continue;
-        if (hitIds.has(e.id)) continue;
-        hitIds.add(e.id);
+        if (hitIds.has(e.uid)) continue;
+        hitIds.add(e.uid);
         game.hitEnemy(e, dmg, {
           from: p, crit: Math.random() < p.stats.crit, critDmg: p.stats.critDmg,
           knock: 40, angle: p.aimAngle, lifesteal: p.stats.lifesteal,
@@ -161,6 +165,65 @@ export function castSkill(game, p, index, sk) {
       break;
     }
 
+    case 'meteor': {
+      sfx(P.sound);
+      const maxD = 200;
+      const d = Math.min(maxD, Math.hypot(game.mouseWorld.x - p.x, game.mouseWorld.y - p.y));
+      const cx = p.x + Math.cos(p.aimAngle) * d;
+      const cy = p.y - 8 + Math.sin(p.aimAngle) * d;
+      game.addFx(new MeteorFx(p, cx, cy, P.radius * aoeMul, P.count, P.duration, P.blast * aoeMul, dmg));
+      break;
+    }
+
+    case 'warcry': {
+      sfx(P.sound);
+      const radius = P.radius * aoeMul;
+      game.addFx(new NovaFx(p.x, p.y - 8, radius, ['#ffd85a', '#fff2c0', '#ffffff'], 0.55));
+      game.addEffect({ sprite: 'fx:shock', frames: 5, x: p.x, y: p.y - 8, life: 0.5, scale: radius / 30 });
+      game.particles.burst(p.x, p.y - 8, 30, { color: ['#ffd85a', '#ff9a2a', '#ffffff'], speed: 160, life: 0.7 });
+      game.aoeDamage(p.x, p.y, radius, dmg, {
+        from: p, crit: Math.random() < p.stats.crit, critDmg: p.stats.critDmg,
+        lifesteal: p.stats.lifesteal, knock: 200, stun: P.stun,
+      });
+      const heal = Math.round(p.maxHp * P.heal);
+      p.hp = Math.min(p.maxHp, p.hp + heal);
+      game.float(p.x, p.y - 30, '+' + heal, '#7ae88a', 8);
+      p.addBuff(game, { id: 'warcry', name: 'Grito de Guerra', time: P.buffTime, mods: { atk: P.atkBuff, def: P.defBuff }, color: '#ffd85a' });
+      game.camera.kick(5, 0.4);
+      p.swing = 0.3;
+      break;
+    }
+
+    case 'fan': {
+      sfx(P.sound);
+      const n = P.count;
+      for (let i = 0; i < n; i++) {
+        const a = p.aimAngle + (n === 1 ? 0 : (i / (n - 1) - 0.5) * P.spread);
+        game.spawnProjectile({
+          x: p.x + Math.cos(a) * 10, y: p.y - 10 + Math.sin(a) * 10, angle: a,
+          speed: P.speed, dmg, from: p, sprite: P.sprite, size: P.size, pierce: P.pierce || 0,
+          life: 0.75, crit: Math.random() < p.stats.crit, critDmg: p.stats.critDmg, lifesteal: p.stats.lifesteal,
+        });
+      }
+      game.camera.kick(2, 0.15);
+      p.swing = 0.2;
+      break;
+    }
+
+    case 'smoke': {
+      sfx(P.sound);
+      const radius = P.radius * aoeMul;
+      game.addEffect({ sprite: 'fx:smoke', frames: 5, x: p.x, y: p.y - 6, life: 0.9, scale: radius / 26, alpha: 0.95 });
+      game.particles.burst(p.x, p.y - 8, 26, { color: ['#8a8a9a', '#b0b0c0', '#4a4a5a'], speed: 90, life: 0.9 });
+      game.aoeDamage(p.x, p.y, radius, dmg, {
+        from: p, crit: Math.random() < p.stats.crit, critDmg: p.stats.critDmg,
+        lifesteal: p.stats.lifesteal, knock: 60, stun: P.stun,
+      });
+      p.addBuff(game, { id: 'smoke', name: 'Fumaça', time: P.buffTime, mods: { speed: P.speedBuff }, flat: { dodge: P.dodge }, color: '#b0b0c0' });
+      p.iframe = Math.max(p.iframe, 0.4);
+      break;
+    }
+
     default:
       break;
   }
@@ -236,7 +299,7 @@ class DashStrikeFx {
     this.life -= dt;
     const p = this.p;
     for (const e of game.enemies) {
-      if (e.dead || this.hit.has(e.id)) continue;
+      if (e.dead || this.hit.has(e.uid)) continue;
       // distância ao segmento sx,sy -> p.x,p.y
       const vx = p.x - this.sx, vy = p.y - this.sy;
       const wx = e.x - this.sx, wy = e.y - this.sy;
@@ -245,7 +308,7 @@ class DashStrikeFx {
       t = clamp(t, 0, 1);
       const dx = this.sx + vx * t - e.x, dy = this.sy + vy * t - e.y;
       if (Math.hypot(dx, dy) < this.P.width + e.radius) {
-        this.hit.add(e.id);
+        this.hit.add(e.uid);
         game.hitEnemy(e, this.dmg, {
           from: p,
           crit: this.P.guaranteedCrit || Math.random() < p.stats.crit,
@@ -290,9 +353,9 @@ class SpinFx {
       h.done = true;
       game.addEffect({ sprite: 'fx:ring', frames: 5, x: this.p.x, y: this.p.y - 8, life: 0.35, scale: this.radius / 22 });
       for (const e of game.enemies) {
-        if (e.dead || h.sets.has(e.id)) continue;
+        if (e.dead || h.sets.has(e.uid)) continue;
         if (Math.hypot(e.x - this.p.x, e.y - this.p.y) < this.radius + e.radius) {
-          h.sets.add(e.id);
+          h.sets.add(e.uid);
           const ang = Math.atan2(e.y - this.p.y, e.x - this.p.x);
           game.hitEnemy(e, this.dmg, {
             from: this.p, crit: Math.random() < this.p.stats.crit, critDmg: this.p.stats.critDmg,
@@ -329,9 +392,9 @@ class BurstFx {
         x: p.x, y: p.y - 10, rot: ang, life: 0.14, scale: range / 20,
       });
       for (const e of game.enemies) {
-        if (e.dead || h.set.has(e.id)) continue;
+        if (e.dead || h.set.has(e.uid)) continue;
         if (inCone(p.x, p.y - 6, ang, this.P.arc / 2, e.x, e.y - 6, range, e.radius)) {
-          h.set.add(e.id);
+          h.set.add(e.uid);
           game.hitEnemy(e, this.dmg, {
             from: p, crit: Math.random() < p.stats.crit, critDmg: p.stats.critDmg,
             knock: 60, angle: ang, lifesteal: p.stats.lifesteal,
@@ -404,5 +467,59 @@ class ArrowRainFx {
     ctx.arc(this.cx, this.cy, this.radius, 0, Math.PI * 2);
     ctx.stroke();
     ctx.restore();
+  }
+}
+
+/** Chuva de meteoros: cada meteoro marca o chão, cai e explode causando dano em área. */
+class MeteorFx {
+  constructor(p, cx, cy, radius, count, duration, blast, dmg) {
+    this.p = p; this.cx = cx; this.cy = cy; this.radius = radius; this.blast = blast; this.dmg = dmg;
+    this.rocks = [];
+    for (let i = 0; i < count; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const rr = Math.sqrt(Math.random()) * radius;
+      this.rocks.push({
+        x: cx + Math.cos(a) * rr, y: cy + Math.sin(a) * rr,
+        delay: (i / count) * duration + Math.random() * 0.15, t: 0, hit: false, fall: 0.6,
+      });
+    }
+    this.life = duration + 1.2;
+  }
+  update(dt, game) {
+    this.life -= dt;
+    for (const m of this.rocks) {
+      if (m.hit) continue;
+      if (m.delay > 0) { m.delay -= dt; continue; }
+      m.t += dt;
+      if (m.t >= m.fall) {
+        m.hit = true;
+        game.addEffect({ sprite: 'fx:boom', frames: 5, x: m.x, y: m.y, life: 0.4, scale: this.blast / 24 });
+        game.particles.burst(m.x, m.y, 14, { color: ['#ff9a2a', '#ffc93a', '#ffffff'], speed: 120, life: 0.5 });
+        game.sfx('fire');
+        game.camera.kick(2.2, 0.15);
+        game.aoeDamage(m.x, m.y, this.blast, this.dmg, {
+          from: this.p, crit: Math.random() < this.p.stats.crit, critDmg: this.p.stats.critDmg,
+          lifesteal: this.p.stats.lifesteal, knock: 100,
+        });
+      }
+    }
+    return this.life > 0;
+  }
+  draw(ctx) {
+    const spr = S('fx:meteor:0');
+    for (const m of this.rocks) {
+      if (m.hit || m.delay > 0) continue;
+      const t = m.t / m.fall;
+      // marca no chão
+      ctx.save();
+      ctx.globalAlpha = 0.25 + t * 0.35;
+      ctx.strokeStyle = '#ff6a1a';
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.ellipse(m.x, m.y, this.blast * (0.4 + t * 0.6), this.blast * 0.35 * (0.4 + t * 0.6), 0, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+      if (spr) ctx.drawImage(spr, Math.round(m.x - spr.width / 2 - (1 - t) * 70), Math.round(m.y - spr.height / 2 - (1 - t) * 180));
+    }
   }
 }

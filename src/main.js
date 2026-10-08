@@ -5,6 +5,7 @@ import { registerAllSprites } from './sprites.js';
 import { Game } from './game/game.js';
 import { UI } from './ui/panels.js';
 import { Input } from './core/input.js';
+import { TouchControls } from './ui/touch.js';
 import { initAudio, resumeAudio, setMusic, setSfx, isMusicOn, isSfxOn } from './core/audio.js';
 
 registerAllSprites();
@@ -14,6 +15,9 @@ const ui = new UI();
 const game = new Game(canvas, ui);
 game.init();
 Input.init(canvas);
+const touch = new TouchControls(game, ui);
+touch.init();
+game.touchControls = touch;
 
 // áudio só pode começar após um gesto do usuário
 let audioReady = false;
@@ -36,8 +40,7 @@ function globalKeys(dt) {
       const id = btn && btn.dataset.cls;
       if (id && !btn.classList.contains('disabled')) {
         ensureAudio();
-        game.startRun(id);
-        ui.hideTitle();
+        ui.startGame(id);
       }
     }
     return;
@@ -69,6 +72,7 @@ function loop(now) {
   ui.tick(dt);
   globalKeys(dt);
   game.frame(dt);
+  touch.update();
   requestAnimationFrame(loop);
 }
 requestAnimationFrame(loop);

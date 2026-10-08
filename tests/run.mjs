@@ -18,6 +18,28 @@ const { generateOverworld, generateDungeon, generateThrone } = await import('../
 const { TILE, SOLID } = await import('../src/world/tiles.js');
 const { Enemy } = await import('../src/game/enemy.js');
 
+// --- utilitário: área aberta (sem obstáculos) dentro de uma zona -----------
+function findClearSpot(game, zoneId, tw = 16, th = 5) {
+  const m = game.maps.overworld;
+  const z = m.zones.find((q) => q.id === zoneId);
+  for (let ty = z.y + 2; ty < z.y + z.h - th - 2; ty++) {
+    for (let tx = z.x + 2; tx < z.x + z.w - tw - 2; tx++) {
+      let clear = true;
+      for (let yy = ty; yy < ty + th && clear; yy++) for (let xx = tx; xx < tx + tw; xx++) if (m.isBlockedTile(xx, yy) || m.isSolidTile(xx, yy)) { clear = false; break; }
+      if (clear) return { x: (tx + 2) * 16 + 8, y: (ty + 2) * 16 + 8 };
+    }
+  }
+  throw new Error('sem área livre em ' + zoneId);
+}
+function toField(game, zoneId = 'fields') {
+  if (game.map.id !== 'overworld') game.loadMap('overworld', game.maps.overworld.spawn);
+  const sp = findClearSpot(game, zoneId);
+  game.player.x = sp.x; game.player.y = sp.y;
+  game.camera.snap(sp.x, sp.y, { w: game.map.pxW, h: game.map.pxH });
+  game.enemies.length = 0;
+  return sp;
+}
+
 // --- mini framework de testes ----------------------------------------------
 let pass = 0, fail = 0;
 const failures = [];
@@ -39,7 +61,7 @@ for (const id of CLASS_IDS) {
 }
 for (const k of Object.keys(ENEMIES)) {
   const d = ENEMIES[k];
-  if (['soldier_sword', 'soldier_archer', 'soldier_heavy'].includes(k)) {
+  if (['soldier_sword', 'soldier_archer', 'soldier_heavy', 'bandit', 'cultist'].includes(k)) {
     for (let f = 0; f < 4; f++) for (let fr = 0; fr < 4; fr++) requiredSprites.push(`${k}:${f}:${fr}`);
   } else for (let fr = 0; fr < 4; fr++) requiredSprites.push(`${k}:${fr}`);
 }
@@ -110,7 +132,7 @@ for (const [name, m] of [['overworld', ow], ['dungeon', dn], ['throne', th]]) {
 section('3. Dados de classes, itens e inimigos');
 for (const id of CLASS_IDS) {
   const c = CLASSES[id];
-  eq(c.skills.length, 3, `${c.name}: 3 habilidades`);
+  eq(c.skills.length, 4, `${c.name}: 4 habilidades`);
   ok(c.stats.hp > 0 && c.stats.atk > 0, `${c.name}: atributos positivos`);
   for (const s of c.skills) ok(s.params && s.cd > 0 && s.cost >= 0, `${c.name}/${s.name}: parâmetros válidos`);
 }
@@ -177,6 +199,7 @@ ok(!game2.map.blocked(game2.player.x, game2.player.y, game2.player.radius), 'col
 
 // ===========================================================================
 section('5. Combate: dano, crítico, morte, XP, ouro e missão');
+toField(game2);
 game2.player.level = 5;
 game2.player.recompute();
 game2.player.hp = game2.player.maxHp;
@@ -224,23 +247,25 @@ game2.hitPlayer(100000, {});
 ok(game2.player.dead, 'jogador morre com dano massivo');
 ok(!document.querySelector('#death').classList.contains('hidden'), 'tela de morte aparece');
 for (let i = 0; i < 260; i++) game2.frame(1 / 60);
-ok(!game2.player.dead, 'jogador renasce após o tempo de morte');
+ok(game2.player.dead, 'jogador continua caído até o jogador escolher renascer (sem renascer sozinho)');
+Input.pressed.Enter = true;
+game2.frame(1 / 60);
+ok(!game2.player.dead, 'jogador renasce ao confirmar (Enter)');
+ok(ui.el.death.classList.contains('hidden'), 'tela de morte some após renascer');
 eq(game2.map.id, 'overworld', 'renascimento acontece no mundo aberto');
 
 // ===========================================================================
 section('6. Habilidades de todas as classes causam efeito');
 for (const cls of CLASS_IDS) {
   const C = CLASSES[cls];
-  for (let s = 0; s < 3; s++) {
+  for (let s = 0; s < 4; s++) {
     game2.mapData.overworld.enemies.length = 0;
     game2.startRun(cls);
     game2.player.level = 12;
     game2.player.recompute();
     game2.player.hp = game2.player.maxHp;
     game2.player.mana = game2.player.maxMana;
-    const sp = game2.maps.overworld.spawn;
-    game2.player.x = sp.x; game2.player.y = sp.y;
-    game2.camera.snap(sp.x, sp.y, { w: game2.map.pxW, h: game2.map.pxH });
+    toField(game2);
     const targets = [];
     for (let i = 0; i < 4; i++) {
       targets.push(game2.spawnEnemy('goblin', game2.player.x + 30 + i * 14, game2.player.y + (i % 2 ? 7 : -7)));
@@ -251,7 +276,7 @@ for (const cls of CLASS_IDS) {
     game2.frame(1 / 60); // atualiza a mira
     const hpSum = targets.reduce((a, t) => a + Math.max(0, t.hp), 0);
     game2.player.cast(game2, s);
-    for (let f = 0; f < 70; f++) {
+    for (let f = 0; f < (C.skills[s].kind === 'meteor' ? 170 : 70); f++) {
       Input.mouse.x = (aim.x - game2.camera.left) * game2.camera.zoom;
       Input.mouse.y = ((aim.y - 8) - game2.camera.top) * game2.camera.zoom;
       game2.frame(1 / 60);
@@ -265,6 +290,7 @@ for (const cls of CLASS_IDS) {
   // ataque básico
   game2.mapData.overworld.enemies.length = 0;
   game2.startRun(cls);
+  toField(game2);
   game2.player.level = 8; game2.player.recompute();
   const t2 = game2.spawnEnemy('goblin', game2.player.x + (C.stats.range > 100 ? 90 : 22), game2.player.y);
   Input.mouse.x = (t2.x - game2.camera.left) * game2.camera.zoom;
@@ -384,6 +410,15 @@ const qid = choices.find((c) => c.act === 'quest-accept').id;
 ui.onAction({ dataset: { act: 'quest-accept', id: qid }, classList: { contains: () => false }, disabled: false });
 eq(game2.quests[qid].state, 'active', 'missão aceita fica ativa');
 const q = QUESTS.find((x) => x.id === qid);
+if (q.goal.zones) {
+  // abates fora da zona da missão não contam
+  const pr0 = game2.quests[qid].progress;
+  const outside = game2.spawnEnemy('slime', game2.player.x + 20, game2.player.y + 20);
+  game2.hitEnemy(outside, 99999, { from: game2.player });
+  for (let f = 0; f < 2; f++) game2.frame(1 / 60);
+  eq(game2.quests[qid].progress, pr0, 'abate fora da zona da missão não conta');
+  toField(game2, q.goal.zones[0]);
+}
 for (let i = 0; i < q.goal.count; i++) {
   const m = game2.spawnEnemy(q.goal.tag === 'soldier' ? 'soldier_sword' : 'slime', game2.player.x + 20, game2.player.y + 20);
   game2.hitEnemy(m, 99999, { from: game2.player });
@@ -461,6 +496,7 @@ ok(c2 && c2.opened, 'estado de baú aberto preservado');
 section('11. Spawn dinâmico e IA dos inimigos');
 game2.startRun('assassin');
 game2.loadMap('overworld', { x: game2.maps.overworld.spawn.x, y: game2.maps.overworld.spawn.y });
+toField(game2);
 let spawnedAny = false;
 for (let i = 0; i < 1200; i++) {
   game2.frame(1 / 60);

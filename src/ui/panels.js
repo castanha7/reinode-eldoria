@@ -2,12 +2,29 @@
 // panels.js — interface em DOM: diálogos, inventário, loja, missões, menus
 // ---------------------------------------------------------------------------
 import { CLASSES, CLASS_IDS } from '../data/classes.js';
-import { QUESTS, questById } from '../data/quests.js';
+import { QUESTS, questById, questUnlocked } from '../data/quests.js';
+import { MODES, MODE_IDS, modeById, MAX_LIVES } from '../data/modes.js';
 import { STAT_INFO, SLOT_INFO, RARITY, describeStats, shopStock, consumable, CONSUMABLES } from '../data/items.js';
 import { sfx } from '../core/audio.js';
+import { Input } from '../core/input.js';
 import { S } from '../sprites.js';
 
 const $ = (sel) => document.querySelector(sel);
+const PANELS = ['dialog', 'inventory', 'shop', 'quests', 'pause', 'help', 'victory'];
+
+/** Poções/itens à venda em cada tipo de loja. */
+const SHOP_LISTS = {
+  shop: ['potion_hp', 'potion_hp_big', 'potion_mana', 'ration', 'scroll_return'],
+  healer: ['potion_hp', 'potion_hp_big', 'potion_mana', 'ration'],
+  smith: ['potion_hp', 'potion_mana'],
+};
+
+/** Canções do bardo (buffs pagos). */
+const SONGS = [
+  { id: 'song_valor', name: 'Canção do Valente', price: 80, desc: '+25% de dano por 90s.', color: '#ff8a5a', mods: { atk: 0.25 }, flat: {}, time: 90 },
+  { id: 'song_stone', name: 'Balada da Pedra', price: 80, desc: '+30% de defesa e +15% de vida máxima por 90s.', color: '#9ab0c8', mods: { def: 0.3, hp: 0.15 }, flat: {}, time: 90 },
+  { id: 'song_wind', name: 'Cantiga do Vento', price: 95, desc: '+20% de velocidade e +10% de esquiva por 90s.', color: '#8ae8ff', mods: { speed: 0.2 }, flat: { dodge: 0.1 }, time: 90 },
+];
 
 export class UI {
   constructor() {
@@ -16,7 +33,9 @@ export class UI {
     this.dialogState = null;
     this.guard = 0;
     this.shopItems = [];
+    this.shopMode = 'shop';
     this.selected = null;
+    this.selMode = 'normal';
     this.el = {
       toasts: $('#toasts'),
       loot: $('#loot-card'),
@@ -28,6 +47,7 @@ export class UI {
       death: $('#death'),
       pause: $('#pause'),
       title: $('#title'),
+      victory: $('#victory'),
       mapname: $('#mapname'),
     };
     this.buildTitle();
@@ -85,13 +105,57 @@ export class UI {
       wrap.appendChild(card);
     }
     this.paintIcons(wrap);
-    const hasSave = (() => { try { return !!localStorage.getItem('eldoria_save_v1'); } catch (e) { return false; } })();
+    this.buildModes();
+    let save = null;
+    try { save = JSON.parse(localStorage.getItem('eldoria_save_v1')); } catch (e) { save = null; }
     const bc = $('#btn-continue');
-    if (bc) bc.classList.toggle('hidden', !hasSave);
-    $('#btn-wipe')?.addEventListener('click', () => {
-      this.game.wipeSave();
-      $('#btn-continue')?.classList.add('hidden');
+    if (bc) {
+      bc.classList.toggle('hidden', !save);
+      if (save) {
+        const M = modeById(save.mode);
+        const cname = CLASSES[save.cls] ? CLASSES[save.cls].name : '';
+        bc.textContent = `Continuar: ${cname} nv ${save.level} · ${M.name}${M.lives !== Infinity && save.lives ? ` · ${'❤'.repeat(save.lives)}` : ''}`;
+      }
+    }
+    const wipe = $('#btn-wipe');
+    if (wipe && !wipe.dataset.bound) {
+      wipe.dataset.bound = '1';
+      wipe.addEventListener('click', () => {
+        this.game.wipeSave();
+        $('#btn-continue')?.classList.add('hidden');
+      });
+    }
+    this.renderTrophies();
+  }
+
+  buildModes() {
+    const wrap = $('#mode-list');
+    if (!wrap) return;
+    wrap.innerHTML = MODE_IDS.map((id) => {
+      const M = MODES[id];
+      return `<div class="mode-card ${id === this.selMode ? 'sel' : ''}" data-mode="${id}" style="--mc:${M.color}">
+        <div class="mc-head"><span class="mc-icon">${M.icon}</span><b>${M.name}</b><span class="mc-lives">${M.lives === Infinity ? '∞' : '❤'.repeat(M.lives)}</span></div>
+        <p>${M.desc}</p>
+      </div>`;
+    }).join('');
+    wrap.querySelectorAll('.mode-card').forEach((n) => n.addEventListener('click', () => {
+      this.selMode = n.dataset.mode;
+      sfx('ui');
+      wrap.querySelectorAll('.mode-card').forEach((c) => c.classList.toggle('sel', c === n));
+    }));
+  }
+
+  renderTrophies() {
+    const box = $('#trophies');
+    if (!box) return;
+    let t = {};
+    try { t = JSON.parse(localStorage.getItem('eldoria_trophies') || '{}'); } catch (e) { t = {}; }
+    const parts = MODE_IDS.filter((id) => t.clears && t.clears[id]).map((id) => {
+      const bt = t.bestTime && t.bestTime[id];
+      const mm = bt ? ` · melhor ${Math.floor(bt / 60)}min` : '';
+      return `<span class="trophy" style="color:${MODES[id].color}">🏆 ${MODES[id].name} ×${t.clears[id]}${mm}</span>`;
     });
+    box.innerHTML = parts.length ? parts.join('') : '';
   }
 
   paintIcons(root) {
@@ -119,8 +183,7 @@ export class UI {
     switch (act) {
       case 'start': {
         const id = node.dataset.cls || 'mage';
-        this.game.startRun(id);
-        this.hideTitle();
+        this.startGame(id);
         break;
       }
       case 'continue':
@@ -163,6 +226,7 @@ export class UI {
         if (g.player.gold < c.price) { g.notify('Ouro insuficiente.', '#ff8a8a'); sfx('deny'); break; }
         if (!g.player.addItem(c)) { g.notify('Inventário cheio!', '#ff8a8a'); sfx('deny'); break; }
         g.player.gold -= c.price;
+        g.notify(`Comprou ${c.name}`, '#7ae88a');
         sfx('coin');
         this.renderShop();
         g.save();
@@ -206,9 +270,36 @@ export class UI {
         g.save();
         break;
       }
+      case 'bard-buy': {
+        const song = SONGS.find((x) => x.id === node.dataset.id);
+        if (!song) break;
+        const price = this.songPrice(song);
+        if (g.player.gold < price) { g.notify('Ouro insuficiente.', '#ff8a8a'); sfx('deny'); break; }
+        g.player.gold -= price;
+        g.player.addBuff(g, { id: song.id, name: song.name, time: song.time, mods: song.mods, flat: song.flat, color: song.color });
+        g.notify(`${song.name}: ${song.desc}`, song.color);
+        sfx('levelup');
+        this.renderShop();
+        g.save();
+        break;
+      }
+      case 'save-quit':
+        g.save();
+        this.closeAll();
+        this.el.victory.classList.add('hidden');
+        g.toTitle();
+        break;
+      case 'victory-continue':
+        this.el.victory.classList.add('hidden');
+        this.updateBlocking();
+        break;
+      case 'to-title':
+        g.toTitle();
+        break;
       case 'quest-accept': {
         const q = questById(node.dataset.id);
         if (!q) break;
+        if (!questUnlocked(q, g.quests)) { g.notify('Essa missão ainda não está disponível.', '#c96a6a'); break; }
         g.quests[q.id].state = 'active';
         g.notify(`Missão aceita: ${q.name}`, '#ffd85a');
         sfx('quest');
@@ -218,7 +309,7 @@ export class UI {
       }
       case 'quest-turn': {
         const q = questById(node.dataset.id);
-        if (!q) break;
+        if (!q || g.quests[q.id].state !== 'done') break;
         g.quests[q.id].state = 'complete';
         g.giveQuestRewards(q);
         this.closeAll();
@@ -243,8 +334,15 @@ export class UI {
   // =========================================================================
   // painéis
   // =========================================================================
+  startGame(id) {
+    this.shopItems = [];
+    this.selected = null;
+    this.game.startRun(id, this.selMode);
+    this.hideTitle();
+  }
+
   anyPanelOpen() {
-    return ['dialog', 'inventory', 'shop', 'quests', 'pause', 'help'].some((k) => !this.el[k].classList.contains('hidden'));
+    return PANELS.some((k) => this.el[k] && !this.el[k].classList.contains('hidden'));
   }
 
   updateBlocking() {
@@ -252,12 +350,13 @@ export class UI {
   }
 
   closeAll() {
-    for (const k of ['dialog', 'inventory', 'shop', 'quests', 'pause', 'help']) this.el[k].classList.add('hidden');
+    for (const k of PANELS) if (this.el[k]) this.el[k].classList.add('hidden');
     this.dialogState = null;
     this.updateBlocking();
   }
 
   togglePanel(name) {
+    if (this.game && this.game.state !== 'playing') return;
     const wasOpen = !this.el[name].classList.contains('hidden');
     this.closeAll();
     if (wasOpen) return;
@@ -290,6 +389,8 @@ export class UI {
         case 'healer': this.openHealer(npc); break;
         case 'smith': this.openSmith(npc); break;
         case 'quest': this.openKing(npc); break;
+        case 'alchemist': this.openAlchemist(npc); break;
+        case 'bard': this.openBard(npc); break;
         default: this.closeAll(); break;
       }
     };
@@ -354,37 +455,42 @@ export class UI {
   // =========================================================================
   openKing(npc) {
     const g = this.game;
+    const own = npc.def.quests || QUESTS.filter((q) => (q.giver || 'king') === 'king').map((q) => q.id);
+    const mine = own.map((id) => questById(id)).filter(Boolean);
     const choices = [];
     let lines = [];
-    for (const q of QUESTS) {
+    for (const q of mine) {
       const st = g.quests[q.id];
-      if (!st) continue;
-      if (st.state === 'done') {
+      if (st && st.state === 'done') {
         lines = lines.concat(q.done || ['Missão cumprida.']);
         choices.push({ act: 'quest-turn', id: q.id, label: `Entregar: ${q.name}` });
       }
     }
     if (!choices.length) {
-      // próxima missão disponível
-      const next = QUESTS.find((q) => {
+      const next = mine.find((q) => {
         const st = g.quests[q.id];
-        if (!st) return false;
-        if (st.state !== 'available') return false;
-        if (q.order === 1) return true;
-        const prev = QUESTS.find((x) => x.order === q.order - 1);
-        return prev && g.quests[prev.id] && g.quests[prev.id].state === 'complete';
+        return st && st.state === 'available' && questUnlocked(q, g.quests);
       });
+      const active = mine.filter((q) => g.quests[q.id] && g.quests[q.id].state === 'active');
       if (next) {
         lines = next.dialog.slice();
         lines.push(`Objetivo: ${next.hint}`);
         lines.push(`Recompensa: ${next.reward.gold} ouro, ${next.reward.xp} XP e um item ${RARITY[next.reward.item] ? RARITY[next.reward.item].name.toLowerCase() : ''}.`);
         choices.push({ act: 'quest-accept', id: next.id, label: `Aceitar: ${next.name}` });
-      } else {
+      } else if (active.length) {
+        const q = active[0];
+        const st = g.quests[q.id];
+        lines = [`Ainda não terminou "${q.name}"?`, `${q.hint} (${Math.min(st.progress, q.goal.count)}/${q.goal.count})`];
+      } else if (npc.npcId === 'king' || (npc.def.title || '').includes('Rei')) {
         lines = [
           'Você já fez por Eldoria mais do que qualquer exército meu faria.',
           'Descanse, herói. O reino respira por sua causa.',
           'Se quiser mais ouro, o mercante compra o que você carrega. E os baús ainda estão por aí.',
         ];
+        const pending = QUESTS.filter((q) => g.quests[q.id] && g.quests[q.id].state === 'available' && !questUnlocked(q, g.quests));
+        if (pending.length) lines.push('Outras ameaças só surgirão quando as anteriores forem vencidas.');
+      } else {
+        lines = ['Por enquanto não tenho mais nada para você. Volte depois de ter vencido outras ameaças — eu aviso.'];
       }
     }
     choices.push({ act: 'close', label: 'Encerrar conversa' });
@@ -395,15 +501,25 @@ export class UI {
     const g = this.game;
     const box = $('#quest-list');
     if (!box) return;
-    box.innerHTML = QUESTS.map((q) => {
+    const GIVERS = { king: 'o Rei Aldric', guard_east: 'o Capitão Dorn', hunter: 'a Caçadora Yara' };
+    const order = { active: 0, done: 1, available: 2, complete: 3 };
+    const list = QUESTS.slice().sort((a, b) => {
+      const sa = g.quests[a.id] || { state: 'available' }, sb = g.quests[b.id] || { state: 'available' };
+      const la = sa.state === 'available' && !questUnlocked(a, g.quests) ? 4 : order[sa.state];
+      const lb = sb.state === 'available' && !questUnlocked(b, g.quests) ? 4 : order[sb.state];
+      return la - lb || a.order - b.order;
+    });
+    box.innerHTML = list.map((q) => {
       const st = g.quests[q.id] || { state: 'available', progress: 0 };
-      const cls = st.state;
-      const label = { available: 'Disponível', active: 'Em andamento', done: 'Concluída — falar com o Rei', complete: 'Completa' }[st.state] || '';
+      const locked = st.state === 'available' && !questUnlocked(q, g.quests);
+      const cls = locked ? 'locked' : st.state;
+      const gv = GIVERS[q.giver || 'king'] || 'o Rei';
+      const label = locked ? 'Bloqueada' : { available: `Disponível — falar com ${gv}`, active: 'Em andamento', done: `Concluída — falar com ${gv}`, complete: 'Completa' }[st.state] || '';
       const prog = q.goal.type === 'kill' ? `${Math.min(st.progress, q.goal.count)}/${q.goal.count}` : '';
       return `<div class="quest ${cls}">
         <div class="q-head"><b>${q.name}</b><span class="q-state">${label}</span></div>
-        <p>${q.text}</p>
-        <div class="q-foot"><span>▸ ${q.hint} ${prog ? `<b class="q-prog">${prog}</b>` : ''}</span>
+        <p>${locked ? 'Conclua as missões anteriores para liberar esta.' : q.text}</p>
+        <div class="q-foot"><span>▸ ${locked ? '???' : q.hint} ${prog && !locked ? `<b class="q-prog">${prog}</b>` : ''}</span>
         <span class="q-reward">${q.reward.gold} ouro · ${q.reward.xp} XP</span></div>
       </div>`;
     }).join('');
@@ -412,26 +528,39 @@ export class UI {
   renderHelp() {
     const box = $('#help-body');
     if (!box) return;
+    const p = this.game && this.game.player;
+    const nsk = p ? p.cls.skills.length : 4;
     box.innerHTML = `
-      <h4>Controles</h4>
+      <h4>Controles (teclado e mouse)</h4>
       <table>
         <tr><td>WASD / Setas</td><td>Mover</td></tr>
         <tr><td>Mouse</td><td>Mirar</td></tr>
         <tr><td>Clique esquerdo</td><td>Atacar (segure para repetir)</td></tr>
-        <tr><td>1 / 2 / 3</td><td>Habilidades da classe</td></tr>
+        <tr><td>1 / 2 / 3 / 4</td><td>Habilidades da classe (a 4ª abre no nível 5)</td></tr>
+        <tr><td>Espaço</td><td>Rolamento de esquiva (invulnerável por instantes)</td></tr>
         <tr><td>E</td><td>Interagir (NPC, baú, portal)</td></tr>
         <tr><td>R</td><td>Beber poção de vida</td></tr>
-        <tr><td>I</td><td>Inventário e equipamentos</td></tr>
-        <tr><td>Q</td><td>Diário de missões</td></tr>
+        <tr><td>I / Q / H</td><td>Inventário / Missões / Ajuda</td></tr>
+        <tr><td>M / N</td><td>Música / efeitos sonoros</td></tr>
         <tr><td>ESC</td><td>Menu / fechar painel</td></tr>
       </table>
+      <h4>Celular</h4>
+      <p class="muted">Joystick à esquerda move o herói. O botão ⚔ à direita ataca com mira automática (arraste-o para mirar manualmente). Botões ao redor: ${nsk} habilidades, esquiva, interagir, poção, inventário e menu.</p>
+      <h4>Modos de jogo</h4>
+      <ul>
+        <li><b>Aventura</b>: sem limite de mortes; você perde um pouco de ouro.</li>
+        <li><b>Clássico</b>: 3 vidas para zerar o jogo. Sem vidas, o progresso é apagado. A <b>Pena da Fênix</b> dá +1 vida (máx. ${MAX_LIVES}).</li>
+        <li><b>Hardcore</b>: uma única vida, inimigos mais fortes e pouca regeneração.</li>
+      </ul>
       <h4>Dicas</h4>
       <ul>
-        <li>Fale com o <b>Rei Aldric</b> no castelo ao norte da cidade para receber missões.</li>
-        <li>Baús dão equipamentos <b>da sua classe</b>: quanto mais perigosa a área, melhor o item.</li>
-        <li>Procure círculos de pedra — três áreas secretas guardam tesouros raros.</li>
-        <li>O <b>ferreiro</b> reforja sua arma permanentemente; o <b>mercante</b> compra seus itens.</li>
-        <li>A <b>Caverna Esquecida</b> fica ao norte, seguindo a estrada. O chefe espera no fundo.</li>
+        <li>Fale com o <b>Rei Aldric</b> no castelo ao norte da cidade. <b>Capitão Dorn</b> (estrada leste) e a <b>Caçadora Yara</b> (floresta) também dão missões.</li>
+        <li>Conclua a história principal entregando a missão do Guardião ao Rei para <b>zerar o jogo</b>. Os três chefes do mundo (Vyrka, Maldrak e Grommash) são desafios opcionais com tesouros.</li>
+        <li>Baús dão equipamentos <b>da sua classe</b>; com a mochila cheia o baú não abre.</li>
+        <li>O rio só se atravessa pelas pontes. Procure círculos de pedra — três áreas secretas guardam tesouros.</li>
+        <li>Chefes têm fases: ao perder vida eles ficam mais perigosos. Use a esquiva nos golpes marcados em vermelho.</li>
+        <li>O <b>ferreiro</b> reforja sua arma; a <b>alquimista</b> vende elixires; o <b>bardo</b> vende bônus temporários.</li>
+        <li>Bandidos roubam ouro — derrote-os para recuperá-lo.</li>
       </ul>`;
   }
 
@@ -496,6 +625,9 @@ export class UI {
       ['Regeneração', s.manaRegen.toFixed(1) + '/s'],
       ['Roubo de Vida', Math.round(s.lifesteal * 100) + '%'],
       ['Esquiva', Math.round(s.dodge * 100) + '%'],
+      ['Regen. de Vida', (s.hpRegen || 0).toFixed(1) + '/s'],
+      ['Ouro Extra', Math.round((s.goldFind || 0) * 100) + '%'],
+      ...(p.maxLives ? [['Vidas', `${p.lives} / ${MAX_LIVES}`]] : []),
       ['Nível', p.level + '  (XP ' + p.xp + '/' + p.xpNeed + ')'],
       ['Arma reforjada', 'Nv ' + p.weaponUpgrades],
       ['Abates', String(p.kills)],
@@ -507,6 +639,37 @@ export class UI {
   // =========================================================================
   // loja / curandeira / ferreiro
   // =========================================================================
+  openAlchemist(npc) {
+    this.el.shop.classList.remove('hidden');
+    $('#shop-title').textContent = `${npc.def.name} — Alquimia`;
+    this.shopMode = 'alchemist';
+    this.shopItems = [];
+    this.renderShop();
+    this.updateBlocking();
+  }
+
+  openBard(npc) {
+    this.el.shop.classList.remove('hidden');
+    $('#shop-title').textContent = `${npc.def.name} — Canções`;
+    this.shopMode = 'bard';
+    this.shopItems = [];
+    this.renderShop();
+    this.updateBlocking();
+  }
+
+  songPrice(song) {
+    return Math.round(song.price * (1 + (this.game.player.level - 1) * 0.08));
+  }
+
+  /** Itens consumíveis oferecidos na loja atual (a Pena só existe no modo Clássico). */
+  potionList() {
+    const mode = this.game ? this.game.mode : 'normal';
+    let ids;
+    if (this.shopMode === 'alchemist') ids = CONSUMABLES.map((c) => c.id).filter((id) => id !== 'phoenix_feather' || mode === 'classic');
+    else ids = SHOP_LISTS[this.shopMode] || SHOP_LISTS.shop;
+    return ids.map((id) => CONSUMABLES.find((c) => c.id === id)).filter(Boolean);
+  }
+
   openShop(npc) {
     if (!this.shopItems.length) {
       this.shopItems = shopStock(Math.random, this.game.player.cls.id);
@@ -541,7 +704,17 @@ export class UI {
     const p = g.player;
     const body = $('#shop-body');
     let html = '';
-    if (this.shopMode === 'smith') {
+    if (this.shopMode === 'alchemist') {
+      html = `<div class="shop-section"><h4>Elixires, poções e pergaminhos</h4>
+        <p class="muted">Elixires de reforço duram de 25 a 35 segundos — beba antes dos chefes.</p>
+        ${this.potionList().map((c) => potionRow(c, p.gold)).join('')}</div>`;
+    } else if (this.shopMode === 'bard') {
+      html = `<div class="shop-section"><h4>Canções de coragem</h4>
+        <p class="muted">Cada canção dura 90 segundos. Só vale uma de cada vez.</p>
+        ${SONGS.map((sg) => `<div class="shop-row"><div><div class="i-name" style="color:${sg.color}">♪ ${sg.name}</div><div class="i-desc">${sg.desc}</div></div>
+          <button class="btn" data-act="bard-buy" data-id="${sg.id}" ${p.gold < this.songPrice(sg) ? 'disabled' : ''}>${this.songPrice(sg)} ouro</button></div>`).join('')}
+      </div>`;
+    } else if (this.shopMode === 'smith') {
       const cost = Math.round(140 * Math.pow(p.weaponUpgrades + 1, 1.65));
       html = `
         <div class="shop-section">
@@ -557,7 +730,7 @@ export class UI {
         </div>
         <div class="shop-section">
           <h4>Poções</h4>
-          ${CONSUMABLES.map((c) => potionRow(c, p.gold)).join('')}
+          ${this.potionList().map((c) => potionRow(c, p.gold)).join('')}
         </div>`;
     } else if (this.shopMode === 'healer') {
       const cost = Math.max(5, Math.round((p.maxHp - p.hp) * 0.5));
@@ -574,7 +747,7 @@ export class UI {
         </div>
         <div class="shop-section">
           <h4>Poções</h4>
-          ${CONSUMABLES.map((c) => potionRow(c, p.gold)).join('')}
+          ${this.potionList().map((c) => potionRow(c, p.gold)).join('')}
         </div>`;
     } else {
       html = `<div class="shop-section"><h4>À venda <span class="muted">(${this.game.player.cls.name})</span></h4>
@@ -584,9 +757,9 @@ export class UI {
             <button class="btn" data-act="buy" data-idx="${i}" ${p.gold < it.price ? 'disabled' : ''}>${it.price} ouro</button>
           </div>`).join('') : '<p class="muted">Esgotado por hoje.</p>'}
       </div>
-      <div class="shop-section"><h4>Poções</h4>${CONSUMABLES.map((c) => potionRow(c, p.gold)).join('')}</div>`;
+      <div class="shop-section"><h4>Poções</h4>${this.potionList().map((c) => potionRow(c, p.gold)).join('')}</div>`;
     }
-    if (this.shopMode !== 'smith') {
+    if (this.shopMode !== 'smith' && this.shopMode !== 'bard') {
       html += `<div class="shop-section"><h4>Seus itens <span class="muted">(clique para vender por 50%)</span></h4>
         <div class="sell-grid">${p.inventory.map((it) => `
           <div class="sell-item" data-uid="${it.uid}" data-act="sell">
@@ -636,14 +809,66 @@ export class UI {
 
   showDeath() {
     const g = this.game;
+    const p = g.player;
+    const lossPct = g.mode === 'normal' ? 0.15 : 0.1;
+    $('#death-title').textContent = 'Você caiu em batalha';
+    $('#death-lives').innerHTML = p.maxLives
+      ? `<div class="lives-row">${Array.from({ length: Math.max(p.maxLives, p.lives) }, (_, i) => `<span class="heart ${i < p.lives ? 'on' : 'off'}">❤</span>`).join('')}</div>
+         <div class="lives-note">${p.lives === 1 ? 'Última vida!' : `Vidas restantes: ${p.lives}`}</div>`
+      : '';
     $('#death-stats').innerHTML = `
-      <div>Nível alcançado: <b>${g.player.level}</b></div>
-      <div>Inimigos derrotados: <b>${g.player.kills}</b></div>
-      <div>Baús abertos: <b>${g.player.chestsOpened}</b></div>
-      <div>Você perderá <b>${Math.round(g.player.gold * 0.15)}</b> de ouro.</div>`;
+      <div>Nível alcançado: <b>${p.level}</b></div>
+      <div>Inimigos derrotados: <b>${p.kills}</b></div>
+      <div>Baús abertos: <b>${p.chestsOpened}</b></div>
+      <div>Você perderá <b>${Math.round(p.gold * lossPct)}</b> de ouro.</div>`;
+    $('#death-actions').innerHTML = '<button class="btn big" data-act="respawn">Acordar na cidade</button><div class="lives-note">(Enter ou Espaço)</div>';
     this.el.death.classList.remove('hidden');
+    this.deathMode = 'respawn';
   }
-  hideDeath() { this.el.death.classList.add('hidden'); }
+
+  showGameOver() {
+    const g = this.game;
+    const p = g.player;
+    const M = modeById(g.mode);
+    $('#death-title').textContent = g.mode === 'hardcore' ? 'Morte definitiva' : 'Fim de jogo';
+    $('#death-lives').innerHTML = `<div class="lives-row">${Array.from({ length: M.lives }, () => '<span class="heart off">❤</span>').join('')}</div>
+      <div class="lives-note">${g.mode === 'hardcore' ? 'Sua única vida acabou.' : 'Você ficou sem vidas.'} O progresso foi apagado.</div>`;
+    const mins = Math.floor(g.stats.time / 60);
+    $('#death-stats').innerHTML = `
+      <div>Classe: <b>${p.cls.name}</b> · Modo: <b>${M.name}</b></div>
+      <div>Nível alcançado: <b>${p.level}</b> · Tempo: <b>${mins} min</b></div>
+      <div>Inimigos derrotados: <b>${p.kills}</b> · Baús: <b>${p.chestsOpened}</b></div>
+      <div>Missões concluídas: <b>${Object.values(g.quests).filter((q) => q.state === 'complete').length}</b></div>`;
+    $('#death-actions').innerHTML = '<button class="btn big" data-act="to-title">Voltar ao título</button>';
+    this.el.death.classList.remove('hidden');
+    this.deathMode = 'gameover';
+  }
+
+  canRespawn() {
+    return this.deathMode === 'respawn' && !this.el.death.classList.contains('hidden');
+  }
+
+  showVictory(t) {
+    const g = this.game;
+    const p = g.player;
+    const M = modeById(g.mode);
+    const bosses = [['spider_queen', 'Vyrka, a Rainha Aranha'], ['lich', 'Maldrak, o Rei Esquelético'], ['titan', 'Grommash, o Colosso de Pedra']];
+    const keys = [...g.killedStatics];
+    const bossLines = bosses.map(([id, nm]) => `<div class="${keys.some((k) => k.includes(`:${id}:`)) ? 'ok' : 'no'}">${keys.some((k) => k.includes(`:${id}:`)) ? '★' : '☆'} ${nm}</div>`).join('');
+    const mins = Math.floor(g.stats.time / 60);
+    $('#victory-body').innerHTML = `
+      <p>O Guardião das Profundezas caiu e o reino respira em paz, <b>${p.cls.name}</b>.</p>
+      <div class="v-stats">
+        <div>Modo: <b style="color:${M.color}">${M.name}</b>${p.maxLives ? ` · Vidas restantes: <b>${p.lives}</b>` : ''}</div>
+        <div>Nível <b>${p.level}</b> · <b>${p.kills}</b> inimigos · <b>${g.stats.deaths}</b> mortes · <b>${mins}</b> min</div>
+      </div>
+      <h4>Senhores das trevas (opcionais)</h4>
+      <div class="v-bosses">${bossLines}</div>
+      <p class="muted">Seu troféu foi guardado na tela de título. Você pode continuar explorando e enfrentar os demais chefes.</p>`;
+    this.el.victory.classList.remove('hidden');
+    this.updateBlocking();
+  }
+  hideDeath() { this.el.death.classList.add('hidden'); this.deathMode = null; }
 
   showTitle() { this.el.title.classList.remove('hidden'); }
   hideTitle() {

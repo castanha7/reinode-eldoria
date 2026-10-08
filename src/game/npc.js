@@ -22,16 +22,50 @@ export class Npc {
     this.isNpc = true;
     this.talked = false;
     this.bobT = Math.random() * 6;
+    // NPCs que passeiam (pets, viajantes, bardo...)
+    this.homeX = x; this.homeY = y;
+    this.wander = this.def.wander || 0;
+    this.wanderT = Math.random() * 3;
+    this.wanderGoal = null;
+    this.moving = false;
+  }
+
+  wanderStep(dt, game) {
+    this.moving = false;
+    if (!this.wander) return;
+    const p = game.player;
+    // para quando o jogador está perto (para conversar)
+    if (Math.hypot(p.x - this.x, p.y - this.y) < 44) return;
+    this.wanderT -= dt;
+    if (this.wanderT <= 0 && !this.wanderGoal) {
+      this.wanderT = 2 + Math.random() * 4;
+      const a = Math.random() * Math.PI * 2, r = Math.random() * this.wander;
+      const gx = this.homeX + Math.cos(a) * r, gy = this.homeY + Math.sin(a) * r;
+      const tx = Math.floor(gx / 16), ty = Math.floor(gy / 16);
+      if (game.map.isOpenSpot(tx, ty) && (!game.map.isSafeAt(this.homeX, this.homeY) || game.map.isSafeAt(gx, gy))) this.wanderGoal = { x: gx, y: gy };
+    }
+    if (!this.wanderGoal) return;
+    const dx = this.wanderGoal.x - this.x, dy = this.wanderGoal.y - this.y;
+    const d = Math.hypot(dx, dy);
+    if (d < 3) { this.wanderGoal = null; return; }
+    const sp = this.def.role === 'pet' ? 34 : 24;
+    const m = game.map.move(this.x, this.y, (dx / d) * sp * dt, (dy / d) * sp * dt, 5);
+    if (Math.hypot(m.x - this.x, m.y - this.y) < 0.02) { this.wanderGoal = null; return; }
+    this.x = m.x; this.y = m.y;
+    this.moving = true;
+    this.facing = facingFromAngle(Math.atan2(dy, dx));
+    this.baseFacing = this.facing;
   }
 
   update(dt, game) {
     this.bobT += dt;
-    this.animT += dt * 1.4;
+    this.wanderStep(dt, game);
+    this.animT += dt * (this.moving ? 5 : 1.4);
     this.frame = Math.floor(this.animT) % 4;
     const p = game.player;
     const d = Math.hypot(p.x - this.x, p.y - this.y);
-    if (d < 70) this.facing = facingFromAngle(Math.atan2(p.y - this.y, p.x - this.x));
-    else this.facing = this.baseFacing;
+    if (d < 70 && !this.moving && this.def.role !== 'pet') this.facing = facingFromAngle(Math.atan2(p.y - this.y, p.x - this.x));
+    else if (!this.moving) this.facing = this.baseFacing;
     this.near = d < 34;
   }
 
@@ -42,7 +76,7 @@ export class Npc {
     const bob = this.frame === 1 || this.frame === 3 ? -1 : 0;
     drawShadow(ctx, this.x, this.y, 8);
     ctx.drawImage(spr, Math.round(this.x - spr.width / 2), Math.round(this.y - spr.height + bob));
-    if (this.near && !this.def.boss) {
+    if (this.near && !this.def.boss && this.def.role !== 'pet') {
       const y = this.y - spr.height - 8 + Math.sin(this.bobT * 4) * 1.5;
       ctx.fillStyle = '#ffe066';
       ctx.fillRect(this.x - 1, y, 2, 4);
@@ -79,9 +113,15 @@ export class Chest {
 
   open(game) {
     if (this.opened) return null;
-    this.opened = true;
     const p = game.player;
-    const gold = Math.round((12 + this.tier * 22) * (0.7 + Math.random() * 0.8));
+    if (p.inventory.length >= 26) {
+      game.notify('Mochila cheia! Libere espaço (I) antes de abrir o baú.', '#ff8a8a');
+      game.sfx('deny');
+      return null;
+    }
+    this.opened = true;
+    const gold = Math.round((12 + this.tier * 22) * (0.7 + Math.random() * 0.8) * (1 + (p.stats.goldFind || 0)) * game.rewardMul());
+    if (this.key) game.openedChests.add(this.key);
     p.gold += gold;
     game.float(this.x, this.y - 22, `+${gold} ouro`, '#ffd85a', 8);
     game.sfx('chest');
@@ -92,13 +132,9 @@ export class Chest {
     let extra = null;
     if (Math.random() < 0.4) extra = consumable(Math.random() < 0.6 ? 'potion_hp' : 'potion_mana');
 
-    const added = p.addItem(item);
-    if (!added) {
-      game.notify('Inventário cheio! Item perdido.', '#ff8a8a');
-    } else {
-      game.showLoot(item, `Baú ${this.secret ? 'secreto' : this.bossChest ? 'do chefe' : 'antigo'}`);
-    }
-    if (extra && p.addItem(extra)) game.notify(`Também havia: ${extra.name}`, '#9ae8ff');
+    // com a mochila cheia o item é vendido na hora (nunca se perde)
+    game.giveItem(item, `Baú ${this.secret ? 'secreto' : this.bossChest ? 'do chefe' : 'antigo'}`);
+    if (extra) game.giveItem(extra, null, `Também havia: ${extra.name}`);
     game.save();
     return item;
   }

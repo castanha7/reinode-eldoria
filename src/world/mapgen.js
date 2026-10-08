@@ -422,6 +422,57 @@ export function generateOverworld(seed = 20260828) {
   secret(186, 40, 'Santuário Partido', 4);
   secret(58, 86, 'Esconderijo do Rio', 2);
 
+  // =========================================================================
+  // COVIS DOS CHEFES DO MUNDO
+  // =========================================================================
+  const lairs = [];
+  /** Limpa um círculo, coloca piso próprio e decora. Retorna o centro. */
+  const arena = (cx, cy, rr, floor, name, id, boss, decor) => {
+    B.objects = B.objects.filter((o) => {
+      const otx = Math.floor(o.x / TS), oty = Math.floor((o.y - 1) / TS);
+      return Math.hypot(otx - cx, oty - cy) > rr + 0.5;
+    });
+    B.lights = B.lights.filter((l) => Math.hypot(l.x / TS - cx - 0.5, l.y / TS - cy - 0.5) > rr + 0.5);
+    B.decals = B.decals.filter((d) => Math.hypot(d.x / TS - cx - 0.5, d.y / TS - cy - 0.5) > rr + 0.5);
+    B.ellipse(cx, cy, rr, rr, floor, 0);
+    decor(cx, cy, rr);
+    B.entities.push({ type: 'enemy', enemy: boss, tx: cx, ty: cy, region: 'lair', boss: true });
+    B.entities.push({ type: 'chest', tx: cx, ty: cy - rr + 2, tier: 4, bossChest: true });
+    B.zones.push({ id, name, x: cx - rr - 1, y: cy - rr - 1, w: rr * 2 + 3, h: rr * 2 + 3, region: 'none', tier: 4, lair: true });
+    lairs.push({ cx, cy, rr });
+  };
+  // Vyrka, a Rainha Aranha — bolsão fechado da Floresta Profunda (um túnel é aberto até ele)
+  arena(31, 10, 6, TILE.DARK_GRASS, 'Covil de Vyrka', 'lair_spider', 'spider_queen', (cx, cy, rr) => {
+    for (let i = 0; i < 14; i++) B.decal('web', cx + r.int(-rr + 1, rr - 1), cy + r.int(-rr + 1, rr - 1));
+    for (let i = 0; i < 6; i++) B.decal('bones', cx + r.int(-rr + 1, rr - 1), cy + r.int(-rr + 1, rr - 1));
+    for (const a of [0.6, 1.9, 3.2, 4.4, 5.6]) {
+      const tx = Math.round(cx + Math.cos(a) * (rr - 1)), ty = Math.round(cy + Math.sin(a) * (rr - 1));
+      B.prop('crystal:1', tx, ty, { h: 24, solid: [1, 1], solidTile: TILE.CRYSTAL, light: true, lightColor: '#ff6ac9', lightR: 70 });
+    }
+  });
+  // Maldrak, o Rei Esquelético — coração das Ruínas
+  arena(164, 56, 8, TILE.RUINS, 'Trono de Maldrak', 'lair_lich', 'lich', (cx, cy, rr) => {
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2 + 0.2;
+      B.prop(i % 2 ? 'pillar' : 'brokenpillar', Math.round(cx + Math.cos(a) * (rr - 1)), Math.round(cy + Math.sin(a) * (rr - 1)), { h: i % 2 ? 40 : 24, solid: [1, 1], solidTile: TILE.ROCK });
+    }
+    for (let i = 0; i < 12; i++) B.decal('bones', cx + r.int(-rr + 2, rr - 2), cy + r.int(-rr + 2, rr - 2));
+    for (const [dx, dy] of [[-3, -3], [3, -3], [-3, 3], [3, 3]]) {
+      B.prop('torch', cx + dx, cy + dy, { h: 24, animated: 3, light: true, lightColor: '#5ad8c0', lightR: 80 });
+    }
+  });
+  // Grommash, o Colosso de Pedra — planície do Vale Sombrio
+  arena(172, 114, 9, TILE.STONE_FLOOR, 'Cratera de Grommash', 'lair_titan', 'titan', (cx, cy, rr) => {
+    for (let i = 0; i < 10; i++) {
+      const a = (i / 10) * Math.PI * 2;
+      B.prop(`rock:${i % 2}`, Math.round(cx + Math.cos(a) * (rr - 1)), Math.round(cy + Math.sin(a) * (rr - 1)), { h: 20, solid: [1, 1], solidTile: TILE.ROCK });
+    }
+    for (let i = 0; i < 10; i++) B.decal('bones', cx + r.int(-rr + 2, rr - 2), cy + r.int(-rr + 2, rr - 2));
+    for (const [dx, dy] of [[-4, 0], [4, 0], [0, -4], [0, 4]]) {
+      B.prop('crystal:1', cx + dx, cy + dy, { h: 24, solid: [1, 1], solidTile: TILE.CRYSTAL, light: true, lightColor: '#ff8a2a', lightR: 70 });
+    }
+  });
+
   // decoração solta
   for (let i = 0; i < 100; i++) {
     const tx = r.int(6, W - 8), ty = r.int(8, H - 6);
@@ -457,6 +508,12 @@ export function generateOverworld(seed = 20260828) {
   ensureReachable(B, home, [120, 118]);
   ensureReachable(B, home, [doorTX, doorTY + 1]);
   for (const s of secrets) ensureReachable(B, [s.cx, s.cy + 6], home);
+  for (const l of lairs) {
+    // entrada aberta ao sul de cada covil (garante que o chefe é alcançável)
+    if (l.cx === 31) carve(B, [22, 17], [l.cx, l.cy + l.rr + 1]); // túnel entre as árvores até o covil de Vyrka
+    carve(B, [l.cx, l.cy + l.rr + 1], [l.cx, l.cy + l.rr - 1]);
+    ensureReachable(B, home, [l.cx, l.cy + l.rr + 1]);
+  }
   for (const e of B.entities) {
     if (e.type === 'chest' && !e.secret) ensureReachable(B, home, [e.tx, e.ty + 1]);
   }
@@ -500,6 +557,15 @@ export function generateOverworld(seed = 20260828) {
   npc('villager_4', 76, 124);
   npc('farmer', 110, 112);
   npc('hunter', 30, 44);
+  npc('alchemist', 47, 109, { face: 0 });
+  npc('bard', 59, 113);
+  npc('fisher', 74, 78, { face: 1 });
+  npc('villager_5', 52, 114);
+  npc('villager_6', 41, 108);
+  npc('dog', 52, 118);
+  npc('cat', 66, 114);
+  npc('hermit', 22, 40, { face: 0 });
+  npc('traveler', 94, 117, { face: 2 });
 
   B.spawnZones = [
     { region: 'forest', x: 8, y: 28, w: 58, h: 52, count: 24 },

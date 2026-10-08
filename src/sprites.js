@@ -1,6 +1,7 @@
 // ---------------------------------------------------------------------------
 // sprites.js — toda a arte do jogo, desenhada proceduralmente em pixel art
 // ---------------------------------------------------------------------------
+import { registerExtraSprites } from './sprites_extra.js';
 import { defineSprite, getSprite, hasSprite, px, disc, ellipse, rectOutline, shade, ramp, INK, pxLine } from './core/pixel.js';
 import { RNG } from './core/utils.js';
 import { TILE } from './world/tiles.js';
@@ -316,13 +317,22 @@ export function registerWeaponSprites() {
     px(ctx, 10, 22, 4, 1, '#c9a13c');
   });
   // arco
-  def('w:bow', 24, 24, (ctx) => {
-    px(ctx, 14, 3, 2, 2, '#8b5a2b');
-    px(ctx, 12, 5, 2, 3, '#8b5a2b');
-    px(ctx, 11, 8, 2, 8, '#a8703a');
-    px(ctx, 12, 16, 2, 3, '#8b5a2b');
-    px(ctx, 14, 19, 2, 2, '#8b5a2b');
-    px(ctx, 16, 5, 1, 14, '#e8e2d0');
+  def('w:bow', 24, 20, (ctx) => {
+    // As armas apontam para CIMA no sprite e giram com a mira: o arco é um
+    // arco horizontal (limbos nas laterais), barriga voltada para a frente.
+    const wood = '#8b5a2b', wl = '#b8803a';
+    px(ctx, 11, 2, 2, 3, wl);            // empunhadura (centro)
+    px(ctx, 8, 3, 3, 2, wood); px(ctx, 13, 3, 3, 2, wood);
+    px(ctx, 5, 5, 3, 2, wood); px(ctx, 16, 5, 3, 2, wood);
+    px(ctx, 3, 7, 2, 3, wood); px(ctx, 19, 7, 2, 3, wood);
+    px(ctx, 2, 10, 2, 2, wl); px(ctx, 20, 10, 2, 2, wl);
+    px(ctx, 11, 2, 2, 1, '#e8c08a');
+    // corda
+    px(ctx, 3, 12, 18, 1, '#e8e2d0');
+    // flecha encaixada
+    px(ctx, 11, 0, 2, 12, '#a8803a');
+    px(ctx, 10, 0, 4, 1, '#dfe7f2');
+    px(ctx, 11, 11, 1, 2, '#ffffff'); px(ctx, 13, 11, 1, 2, '#ffffff');
   });
   // adaga
   def('w:dagger', 16, 16, (ctx) => {
@@ -1482,6 +1492,10 @@ export function drawShadow(ctx, x, y, rx, ry = rx * 0.35) {
   ctx.globalAlpha = 1;
 }
 
+export function registerExtraArt() {
+  registerExtraSprites({ def, defSoft, paintHumanoid });
+}
+
 export function registerAllSprites() {
   registerHeroSprites();
   registerWeaponSprites();
@@ -1490,4 +1504,5 @@ export function registerAllSprites() {
   registerPropSprites();
   registerTileSprites();
   registerEffectSprites();
+  registerExtraArt();
 }

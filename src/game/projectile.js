@@ -26,6 +26,7 @@ export class Projectile {
     this.critDmg = o.critDmg || 1.8;
     this.lifesteal = o.lifesteal || 0;
     this.trail = o.trail || null;
+    this.hitOpts = o.hitOpts || null; // efeitos extras ao acertar o jogador (slow, etc.)
     this.dead = false;
     this.hits = new Set();
     this.t = 0;
@@ -54,8 +55,9 @@ export class Projectile {
 
     if (this.hostile) {
       const p = game.player;
-      if (!p.dead && Math.hypot(p.x - this.x, p.y - (this.y)) < p.radius + this.size * 0.5) {
-        game.hitPlayer(this.dmg, { angle: this.angle, knock: 60 });
+      // o corpo do jogador fica ~8px acima dos pés (p.y); o projétil sai da altura do peito
+      if (!p.dead && Math.hypot(p.x - this.x, (p.y - 8) - this.y) < p.radius + 2 + this.size * 0.5) {
+        game.hitPlayer(this.dmg, { angle: this.angle, knock: 60, ...(this.hitOpts || {}) });
         this.explode(game, true);
         return;
       }

@@ -12,6 +12,10 @@
  *  spin         — giro completo (vários pulsos)
  *  arrow_rain   — flechas caindo numa área
  *  blink        — deslocamento curto sem dano
+ *  meteor       — meteoros caem numa área durante alguns segundos
+ *  warcry       — onda de choque que atordoa + buff de ataque/defesa + cura
+ *  fan          — leque de flechas em arco
+ *  smoke        — bomba de fumaça: cega inimigos e dá esquiva
  */
 
 export const CLASSES = {
@@ -44,6 +48,11 @@ export const CLASSES = {
         id: 'ice_burst', name: 'Explosão de Gelo', kind: 'nova', level: 3, cost: 22, cd: 6.5,
         desc: 'Explode gelo no ponto mirado, causando dano e lentidão por 3s.',
         params: { dmgMul: 2.1, radius: 78, slow: 0.45, slowTime: 3.0, sound: 'ice', scale: 0.11 },
+      },
+      {
+        id: 'meteor_storm', name: 'Chuva de Meteoros', kind: 'meteor', level: 5, cost: 40, cd: 15,
+        desc: 'Invoca 7 meteoros flamejantes sobre a área mirada. Devastador contra grupos.',
+        params: { dmgMul: 2.2, radius: 92, count: 7, duration: 1.8, blast: 36, sound: 'fire', scale: 0.12 },
       },
     ],
   },
@@ -78,6 +87,11 @@ export const CLASSES = {
         desc: 'Gira a espada atingindo tudo ao redor em três pulsos.',
         params: { dmgMul: 1.5, radius: 66, pulses: 3, pulseGap: 0.16, sound: 'swing', scale: 0.10 },
       },
+      {
+        id: 'war_cry', name: 'Grito de Guerra', kind: 'warcry', level: 5, cost: 28, cd: 18,
+        desc: 'Atordoa inimigos próximos, cura 18% da vida e ganha +30% dano e +40% defesa por 8s.',
+        params: { dmgMul: 1.2, radius: 105, stun: 1.4, heal: 0.18, atkBuff: 0.3, defBuff: 0.4, buffTime: 8, sound: 'boss', scale: 0.10 },
+      },
     ],
   },
 
@@ -111,6 +125,11 @@ export const CLASSES = {
         desc: 'Flecha que detona ao impactar, ferindo todos em volta.',
         params: { dmgMul: 1.8, speed: 400, radius: 54, size: 12, sprite: 'fx:arrow_fire', sound: 'fire', scale: 0.11 },
       },
+      {
+        id: 'arrow_fan', name: 'Saraivada', kind: 'fan', level: 5, cost: 26, cd: 9,
+        desc: 'Dispara de uma só vez um leque de 9 flechas perfurantes.',
+        params: { dmgMul: 1.05, count: 9, spread: 1.15, speed: 520, size: 10, pierce: 1, sprite: 'fx:arrow', sound: 'shoot', scale: 0.10 },
+      },
     ],
   },
 
@@ -143,6 +162,11 @@ export const CLASSES = {
         id: 'shadow_step', name: 'Passo das Sombras', kind: 'blink', level: 3, cost: 10, cd: 4.0,
         desc: 'Some entre as sombras por uma curta distância, ficando intocável.',
         params: { distance: 130, iframes: 0.55, sound: 'dash', scale: 0 },
+      },
+      {
+        id: 'smoke_bomb', name: 'Bomba de Fumaça', kind: 'smoke', level: 5, cost: 24, cd: 14,
+        desc: 'Cega inimigos ao redor e te dá +40% esquiva e +25% velocidade por 5s.',
+        params: { dmgMul: 1.1, radius: 84, stun: 1.6, dodge: 0.4, speedBuff: 0.25, buffTime: 5, sound: 'ice', scale: 0.10 },
       },
     ],
   },
@@ -182,3 +206,6 @@ export function xpForLevel(n) {
 export function skillsUnlocked(cls, level) {
   return classById(cls).skills.filter((s) => level >= s.level);
 }
+
+/** Rolamento (tecla Espaço) — igual para todas as classes. */
+export const ROLL = { cd: 1.4, distance: 78, speed: 330, iframes: 0.32 };
