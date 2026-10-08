@@ -200,7 +200,8 @@ export class TouchControls {
     fire.addEventListener('pointercancel', fend);
 
     // posições em arco ao redor do botão de ataque (0° = esquerda, 90° = acima)
-    const ring = 100;
+    // com 5+ habilidades o anel abre e os botões encolhem para não se tocarem
+    let ring = 100;
     const place = (deg, size) => {
       const rad = (deg * Math.PI) / 180;
       const cx = fcx + Math.cos(rad) * ring;
@@ -208,11 +209,14 @@ export class TouchControls {
       return [cx - size / 2, cy - size / 2];
     };
     const nsk = p.cls.skills.length;
-    const SK = 50;
-    const degs = nsk === 4 ? [3, 33, 63, 93] : [5, 40, 75];
+    const SK = nsk > 4 ? 44 : 50;
+    if (nsk > 4) ring = 112;
+    // arco genérico: distribui N botões uniformemente de 3° a 93°
+    // (com 4 habilidades gera exatamente [3, 33, 63, 93] — o layout antigo)
+    const degAt = (i) => (nsk > 1 ? 3 + (i * 90) / (nsk - 1) : 45);
     for (let i = 0; i < nsk; i++) {
       const sk = p.cls.skills[i];
-      const [rr, bb] = place(degs[i], SK);
+      const [rr, bb] = place(degAt(i), SK);
       const b = mk('tc-skill', SK, rr, bb, `<canvas width="22" height="22"></canvas><i>${i + 1}</i><em></em>`);
       const cv = b.querySelector('canvas');
       const spr = S(`skill:${sk.id}`);

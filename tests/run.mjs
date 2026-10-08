@@ -61,7 +61,7 @@ for (const id of CLASS_IDS) {
 }
 for (const k of Object.keys(ENEMIES)) {
   const d = ENEMIES[k];
-  if (['soldier_sword', 'soldier_archer', 'soldier_heavy', 'bandit', 'cultist'].includes(k)) {
+  if (['soldier_sword', 'soldier_archer', 'soldier_heavy', 'bandit', 'cultist', 'shaman'].includes(k)) {
     for (let f = 0; f < 4; f++) for (let fr = 0; fr < 4; fr++) requiredSprites.push(`${k}:${f}:${fr}`);
   } else for (let fr = 0; fr < 4; fr++) requiredSprites.push(`${k}:${fr}`);
 }
@@ -132,7 +132,7 @@ for (const [name, m] of [['overworld', ow], ['dungeon', dn], ['throne', th]]) {
 section('3. Dados de classes, itens e inimigos');
 for (const id of CLASS_IDS) {
   const c = CLASSES[id];
-  eq(c.skills.length, 4, `${c.name}: 4 habilidades`);
+  eq(c.skills.length, 5, `${c.name}: 5 habilidades`);
   ok(c.stats.hp > 0 && c.stats.atk > 0, `${c.name}: atributos positivos`);
   for (const s of c.skills) ok(s.params && s.cd > 0 && s.cost >= 0, `${c.name}/${s.name}: parâmetros válidos`);
 }
@@ -153,7 +153,7 @@ for (const cls of CLASS_IDS) {
 eq(badRoll, 0, 'loot sempre gera equipamento da classe do jogador');
 const rarities = new Set();
 for (let i = 0; i < 4000; i++) rarities.add(rollRarity(Math.random, 4));
-eq(rarities.size, 4, 'todas as 4 raridades aparecem nos baús');
+eq(rarities.size, 5, 'todas as 5 raridades aparecem nos baús');
 ok(ITEMS.length >= 60, `catálogo de itens (${ITEMS.length})`);
 ok(CONSUMABLES.length >= 4, `consumíveis (${CONSUMABLES.length})`);
 
@@ -803,7 +803,7 @@ section('19. Controles de toque (celular)');
   ok(Input.touch.enabled === false, 'toque desligado por padrão no desktop');
   tc.enable();
   ok(Input.touch.enabled && tc.built, 'controles de toque ativam e constroem a interface');
-  ok(tc.btns.filter((b) => b.kind === 'skill').length === 4, 'um botão para cada uma das 4 habilidades');
+  ok(tc.btns.filter((b) => b.kind === 'skill').length === game2.player.cls.skills.length, 'um botão de toque para cada habilidade da classe');
   // joystick move o personagem
   const jx = game2.player.x;
   tc.joy.ox = 100; tc.joy.oy = 300;
@@ -863,6 +863,188 @@ section('20. Mapa: sem baús/inimigos/NPCs presos e sem terreno bloqueando');
   for (let ty = 0; ty < ow.h && !water; ty++) for (let tx = 0; tx < ow.w; tx++) if (ow.tile(tx, ty) === TILE.WATER) { water = { tx, ty }; break; }
   ok(!!water && ow.isBlockedTile(water.tx, water.ty), 'água bloqueia o movimento');
   ok(!ow.isSolidTile(water.tx, water.ty), 'mas projéteis passam sobre a água');
+}
+
+// ===========================================================================
+section('21. v2.1 — raridades, drops, comportamentos novos, morte e save');
+{
+  const items = await import('../src/data/items.js');
+  const { RARITY, RARITY_ORDER, rarityWeights, rollMobLoot, rollMobDrop, pickEquipmentOfRarity, describeStats, ITEMS: ITEM_LIST } = items;
+  eq(RARITY_ORDER.join(','), 'common,rare,epic,legendary,mythic', '5 raridades na ordem certa');
+  ok(RARITY.mythic && RARITY.mythic.order === 4 && RARITY.mythic.color, 'raridade Mítica existe com cor própria');
+  eq(rarityWeights(1).mythic || 0, 0, 'sem míticos em áreas baixas (t1)');
+  ok(rarityWeights(4).mythic > 0, 'mítico possível só em áreas de alto risco');
+
+  // distribuição: maioria sem drop; lendário/mítico raros mas possíveis
+  let none = 0, leg = 0, myth = 0;
+  for (let i = 0; i < 20000; i++) {
+    const r = rollMobLoot(Math.random, 2, 'mob');
+    if (!r) none++; else if (r === 'legendary') leg++; else if (r === 'mythic') myth++;
+  }
+  ok(none / 200 > 60, `maioria dos mobs sem drop de equipamento (${(none / 200).toFixed(0)}%)`);
+  ok(leg > 0 && myth > 0 && myth < leg, 'lendário e mítico: raros, possíveis, e o mítico mais raro');
+  ok(myth / 20000 < 0.01, 'mítico de mob comum abaixo de 1%');
+  let bossLeg = 0, mobLeg = 0;
+  for (let i = 0; i < 4000; i++) {
+    if (rollMobLoot(Math.random, 4, 'boss') === 'legendary') bossLeg++;
+    if (rollMobLoot(Math.random, 4, 'mob') === 'legendary') mobLeg++;
+  }
+  ok(bossLeg > mobLeg * 4, `chances de chefe são muito melhores (${bossLeg} vs ${mobLeg})`);
+  ok(rollMobLoot(() => 0.999, 4, 'boss') !== null && rollMobLoot(() => 0.001, 4, 'boss') !== null, 'tabela de chefe nunca devolve "nada" (drop garantido)');
+
+  // cada raridade gera item válido para cada classe
+  for (const cls of CLASS_IDS) {
+    for (const rk of RARITY_ORDER) {
+      const it = pickEquipmentOfRarity(Math.random, cls, rk, 3);
+      ok(it && it.cls === cls && it.rarity === rk, `${cls}: item ${rk} gerado corretamente`);
+    }
+  }
+  ok(ITEM_LIST.some((i) => i.rarity === 'mythic'), 'catálogo tem itens míticos');
+  ok(!ITEM_LIST.some((i) => i.rarity === 'mythic' && i.price < 4000), 'míticos têm preço à altura');
+
+  // sorteio não é determinístico por mob
+  const seen = new Set();
+  for (let i = 0; i < 500; i++) { const d = rollMobDrop(Math.random, 'mage', 2, 'mob'); if (d) seen.add(d.name); }
+  ok(seen.size > 1, 'o mesmo tipo de mob solta itens diferentes (aleatório, não lista fixa)');
+
+  // stats negativos: sem "+-4"
+  ok(!describeStats({ speed: -4, atk: 3 }).join(' ').includes('+-'), 'sinal correto em stats negativos');
+
+  // inimigos novos: comportamentos distintos de verdade
+  const kinds = new Set(Object.values(ENEMIES).map((d) => d.ai));
+  for (const kind of ['hitrun', 'supporter', 'burrower', 'harpy', 'kamikaze', 'sentry']) ok(kinds.has(kind), `IA de comportamento "${kind}" existe`);
+  ok(!!ENEMIES.imp.drops && !!ENEMIES.plague_rat.attack.dot, 'rato da peste envenena e imp tem drops configurados');
+  eq(ENEMIES.skalla.bossKind, 'frost', 'Skalla é chefe de gelo');
+  eq(ENEMIES.ashkaru.bossKind, 'ember', 'Ashkaru é chefe de fogo');
+  ok(ENEMIES.ashkaru.hp > ENEMIES.titan.hp && ENEMIES.skalla.hp > ENEMIES.lich.hp, 'novos chefes escalam com a progressão');
+  const bossEnts = ow.entities.filter((e) => e.type === 'enemy' && e.boss);
+  eq(bossEnts.length, 5, 'mundo tem 5 chefes de mapa');
+  const lairZones = ow.zones.filter((z) => z.lair);
+  eq(lairZones.length, 5, 'as 5 arenas existem no mapa');
+
+  // 5ª habilidade em todas as classes, nível 8
+  for (const clsId of CLASS_IDS) {
+    const s5 = CLASSES[clsId].skills[4];
+    ok(s5 && s5.level === 8 && s5.params, `${CLASSES[clsId].name}: 5ª habilidade no nível 8 com params`);
+  }
+
+  // --- jogador: veneno, juramento, cooldowns dinâmicos ----------------------
+  game2.startRun('knight', 'normal');
+  toField(game2);
+  const pg = game2.player;
+  eq(pg.skillCd.length, pg.cls.skills.length, 'cooldowns do tamanho das habilidades da classe');
+  pg.applyDot(game2, { t: 3, dps: 10 });
+  ok(pg.dotT === 3 && pg.dotDps === 10, 'DoT aplicado ao jogador');
+  pg.hp = pg.maxHp;
+  const before = pg.hp;
+  for (let i = 0; i < 64; i++) game2.frame(1 / 60);
+  ok(pg.hp < before, 'veneno tira vida sozinho (tick por segundo)');
+  pg.dotT = 0; pg.dotDps = 0;
+  // juramento reduz o dano
+  const h0 = pg.hp;
+  pg.iframe = 0; pg.vowT = 0;
+  game2.hitPlayer(120, { angle: 0, knock: 0 });
+  const plain = h0 - pg.hp;
+  pg.hp = h0; pg.iframe = 0;
+  pg.vowT = 5; pg.vowReduce = 0.4; pg.vowReflect = 0;
+  game2.hitPlayer(120, { angle: 0, knock: 0 });
+  const vowed = h0 - pg.hp;
+  ok(vowed < plain * 0.75, `Juramento de Ferro reduz dano (${plain.toFixed(0)} → ${vowed.toFixed(0)})`);
+  pg.vowT = 0; pg.vowReduce = 0; pg.vowReflect = 0;
+
+  // --- execução: sem alvo não gasta nada ------------------------------------
+  game2.startRun('assassin', 'normal');
+  toField(game2);
+  const pa = game2.player;
+  pa.level = 9; pa.recompute();
+  pa.skillCd = pa.skillCd.map(() => 0);
+  pa.mana = pa.maxMana;
+  game2.enemies.length = 0;
+  const manaBefore = pa.mana;
+  pa.cast(game2, 4);
+  ok(pa.skillCd[4] === 0 && pa.mana === manaBefore, 'Execução sem alvo: nenhum custo gasto');
+  const e0 = game2.spawnEnemy('slime', pa.x + 120, pa.y, {});
+  e0.spawnT = 0; e0.hp = 1;
+  pa.cast(game2, 4);
+  ok(pa.skillCd[4] > 0 || e0.dead, 'Execução com alvo gasta cooldown/mata o ferido');
+
+  // --- marca do falcão amplifica dano ----------------------------------------
+  const e1 = game2.spawnEnemy('slime', pa.x + 60, pa.y, {});
+  e1.spawnT = 0;
+  let noMark = 0;
+  for (let i = 0; i < 300; i++) { e1.hp = e1.maxHp; noMark += game2.hitEnemy(e1, 20, {}) || 0; }
+  e1.applyMark(0.5, 8);
+  let marked = 0;
+  for (let i = 0; i < 300; i++) { e1.hp = e1.maxHp; marked += game2.hitEnemy(e1, 20, {}) || 0; }
+  ok(marked > noMark * 1.3 && marked < noMark * 1.7, 'alvo marcado recebe ~+50% de dano');
+  e1.markT = 0; e1.markAmt = 0;
+
+  // --- soterrado é intocável ---------------------------------------------------
+  const e2 = game2.spawnEnemy('burrower', pa.x + 40, pa.y, {});
+  e2.untargetable = true;
+  const hp2 = e2.hp;
+  ok(game2.hitEnemy(e2, 50, {}) === 0 && e2.hp === hp2, 'mob soterrado não recebe dano');
+  ok(game2.nearestEnemy(e2.x, e2.y, 220) !== e2, 'mob soterrado não é mirado pelo auto-aim');
+  e2.untargetable = false;
+
+  // --- shaman: sprites 4-dir resolvem ------------------------------------------
+  const sh = game2.spawnEnemy('shaman', pa.x + 80, pa.y, {});
+  sh.facing = 1;
+  ok(!!getSprite(sh.spriteKey()), 'xamã tem sprites nas 4 direções');
+
+  // --- morte: penalidade aplicada na hora, save sadio ----------------------------
+  game2.startRun('knight', 'normal');
+  const pk = game2.player;
+  toField(game2);
+  pk.gold = 200;
+  pk.hp = 1; pk.iframe = 0;
+  pk.takeDamage(game2, 9999, {});
+  ok(pk.dead, 'jogador morre');
+  eq(pk.gold, 170, 'penalidade de ouro aplicada NA MORTE (não no respawn)');
+  const saveData = JSON.parse(localStorage.getItem('eldoria_save_v1') || 'null');
+  ok(saveData, 'save gravado no momento da morte');
+  eq(saveData.map, 'overworld', 'save do morto aponta para a cidade');
+  eq(Math.round(saveData.pos.x), Math.round(game2.maps.overworld.spawn.x), 'posição salva = spawn da cidade');
+  ok(Math.round(saveData.hp) >= Math.round(pk.maxHp) - 1, 'save do morto já curado');
+  const gAfter = pk.gold;
+  game2.respawnPlayer();
+  eq(pk.gold, gAfter, 'respawn NÃO cobra a penalidade duas vezes');
+  ok(!pk.dead && pk.hp === pk.maxHp, 'respawn levanta o herói intacto');
+  // clássico: morrer gasta vida, save mantém a contagem
+  game2.startRun('knight', 'classic');
+  const pc = game2.player;
+  toField(game2);
+  eq(pc.lives, 3, 'clássico começa com 3 vidas');
+  pc.hp = 1; pc.iframe = 0;
+  pc.takeDamage(game2, 9999, {});
+  eq(pc.lives, 2, 'morte consome 1 vida imediatamente');
+  const cs = JSON.parse(localStorage.getItem('eldoria_save_v1') || 'null');
+  eq(cs.lives, 2, 'o save guarda a vida perdida (sem exploit de recarregar aba)');
+  game2.respawnPlayer();
+  eq(pc.lives, 2, 'vida não é gasta de novo no respawn');
+  // hardcore: 1 vida = game over direto
+  game2.startRun('knight', 'hardcore');
+  const ph = game2.player;
+  toField(game2);
+  ph.hp = 1; ph.iframe = 0;
+  ph.takeDamage(game2, 9999, {});
+  eq(game2.state, 'gameover', 'hardcore: morrer encerra a partida');
+  eq(localStorage.getItem('eldoria_save_v1'), null, 'hardcore: save apagado de verdade');
+
+  // --- modos: buff do hardcore perceptível mas contido --------------------------
+  const { MODES } = await import('../src/data/modes.js');
+  const HC = MODES.hardcore;
+  ok(HC.lives === 1 && HC.hp > 1.1 && HC.hp <= 1.3 && HC.dmg > 1.1 && HC.dmg <= 1.25 && HC.regen < 1, `hardcore calibrado (hp×${HC.hp} dmg×${HC.dmg} regen×${HC.regen})`);
+
+  // --- missões novas amarradas na cadeia ------------------------------------------
+  const { QUESTS, questById } = await import('../src/data/quests.js');
+  ok(questById('q_frost').requires.includes('q_lich'), 'q_frost exige q_lich');
+  ok(questById('q_ember').requires.includes('q_titan'), 'q_ember exige q_titan');
+  eq(questById('q_frost').goal.tag, 'skalla', 'q_frost caça Skalla');
+  eq(questById('q_ember').goal.tag, 'ashkaru', 'q_ember caça Ashkaru');
+  const { NPC_DEFS } = await import('../src/data/npcs.js');
+  ok(NPC_DEFS.king.quests.includes('q_frost') && NPC_DEFS.king.quests.includes('q_ember'), 'o Rei oferece as duas missões novas');
+  ok(QUESTS.every((q) => !q.requires || q.requires.every((r) => questById(r))), 'nenhuma dependência de missão quebrada');
 }
 
 // ===========================================================================

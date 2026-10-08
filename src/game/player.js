@@ -3,7 +3,7 @@
 // ---------------------------------------------------------------------------
 import { classById, baseStatsAt, xpForLevel, ROLL } from '../data/classes.js';
 import { facingFromAngle, inCone, rollDamage, isCrit, mitigate } from './combat.js';
-import { castSkill } from './abilities.js';
+import { castSkill, hasExecuteTarget } from './abilities.js';
 import { S, getTinted, drawShadow } from '../sprites.js';
 import { clamp } from '../core/utils.js';
 import { Input } from '../core/input.js';
@@ -40,7 +40,9 @@ export class Player {
 
     this.atkTimer = 0;
     this.swing = 0;
-    this.skillCd = [0, 0, 0, 0];
+    this.skillCd = new Array(Math.max(4, this.cls.skills.length)).fill(0);
+    this.dotT = 0; this.dotDps = 0; this.dotAcc = 0; this.dotColor = '#8aff8a';
+    this.vowT = 0; this.vowReduce = 0; this.vowReflect = 0;
     this.rollCd = 0;
     this.rollT = 0;
     this.rollDir = 0;
@@ -163,6 +165,7 @@ export class Player {
     if (game && b.name) game.float(this.x, this.y - 34, b.name, b.color || '#ffe066', 7);
   }
   useItem(uid, game) {
+    if (this.dead) { game.notify('Você está caído — use itens depois de levantar.', '#c96a6a'); sfx('deny'); return false; }
     const it = this.inventory.find((x) => x.uid === uid);
     if (!it || it.kind !== 'consumable') return false;
     // não desperdiça poção sem efeito
@@ -296,6 +299,21 @@ export class Player {
       }
     }
     this.slowT = Math.max(0, this.slowT - dt);
+    // veneno/queimadura: 1 tick por segundo enquanto durar
+    if (this.dotT > 0) {
+      this.dotT -= dt;
+      this.dotAcc += dt;
+      if (this.dotAcc >= 1) {
+        this.dotAcc -= 1;
+        const d = Math.max(1, Math.round(this.dotDps * (1 + this.level * 0.01)));
+        this.hp -= d;
+        game.float(this.x, this.y - 22, String(d), this.dotColor, 6);
+        game.particles.burst(this.x, this.y - 10, 4, { color: [this.dotColor, '#ffffff'], speed: 30, life: 0.4 });
+        if (this.hp <= 0 && !this.dead) this.die(game);
+      }
+      if (this.dotT <= 0) { this.dotT = 0; this.dotDps = 0; this.dotAcc = 0; }
+    }
+    if (this.vowT > 0) this.vowT = Math.max(0, this.vowT - dt);
 
     // limites do mapa
     this.x = clamp(this.x, 8, game.map.pxW - 8);
@@ -377,6 +395,12 @@ export class Player {
 
   cast(game, i) {
     const sk = this.cls.skills[i];
+    // Execução exige alvo: não gasta mana nem cooldown sem ninguém ferido por perto
+    if (sk.kind === 'execute' && !hasExecuteTarget(game, this, sk.params.range)) {
+      game.notify('Nenhum inimigo ferido ao alcance da Execução.', '#9a9ab0');
+      sfx('deny');
+      return;
+    }
     this.mana -= sk.cost;
     this.skillCd[i] = this.skillCooldown(i);
     castSkill(game, this, i, sk);
@@ -423,6 +447,17 @@ export class Player {
   }
 
   // --- dano ----------------------------------------------------------------
+  /** Veneno/queimadura: dano ao longo do tempo, ignora iframes. */
+  applyDot(game, dot) {
+    if (!dot) return;
+    // renova/empilha de forma controlada: mantém o mais forte, soma tempo
+    const dps = Math.max(this.dotT > 0 ? this.dotDps : 0, dot.dps);
+    this.dotDps = dps;
+    this.dotT = Math.max(this.dotT, dot.t);
+    this.dotColor = dot.color || '#8aff8a';
+    game.float(this.x, this.y - 34, dot.label || 'envenenado', this.dotColor, 6);
+  }
+
   takeDamage(game, raw, opts = {}) {
     if (this.dead) return 0;
     if (this.iframe > 0) return 0;
@@ -431,9 +466,16 @@ export class Player {
       game.float(this.x, this.y - 26, 'ESQUIVA', '#9ae8ff', 7);
       return 0;
     }
-    const dmg = Math.max(1, mitigate(raw, this.stats.def));
+    let dmg = Math.max(1, mitigate(raw * (this.vowT > 0 ? 1 - this.vowReduce : 1), this.stats.def));
+    // Juramento de Ferro: reflete parte do dano corpo a corpo
+    if (this.vowT > 0 && this.vowReflect > 0 && opts.from && opts.from.isEnemy && !opts.from.isBoss) {
+      const rf = Math.round(dmg * this.vowReflect);
+      if (rf > 0) opts.from.takeDamage(game, rf, { from: this, angle: Math.atan2(opts.from.y - this.y, opts.from.x - this.x), knock: 60 });
+      game.float(this.x, this.y - 40, `reflete ${rf}`, '#ffd85a', 6);
+    }
     this.hp -= dmg;
     if (opts.slowPlayer) this.slowT = Math.max(this.slowT, opts.slowPlayer);
+    if (opts.dot) this.applyDot(game, opts.dot);
     this.hurtFlash = 1;
     this.iframe = 0.45;
     game.lastDamageTaken = game.time;
@@ -466,16 +508,19 @@ export class Player {
     this.dead = false;
     this.buffs = [];
     this.slowT = 0; this.webbedT = 0;
+    this.dotT = 0; this.dotDps = 0; this.dotAcc = 0;
+    this.vowT = 0; this.vowReduce = 0; this.vowReflect = 0;
     this.dashT = 0; this.dashVX = 0; this.dashVY = 0; this.rollT = 0;
     this.skillCd = this.skillCd.map(() => 0);
     this.recompute();
     this.hp = this.maxHp;
     this.mana = this.maxMana;
     this.iframe = 2;
-    const lost = game.mode === 'normal' ? Math.round(this.gold * 0.15) : Math.round(this.gold * 0.1);
-    this.gold = Math.max(0, this.gold - lost);
+    // a penalidade de ouro já foi aplicada no momento da morte (onPlayerDeath)
+    const lost = this.deathGoldLoss || 0;
+    this.deathGoldLoss = 0;
     game.loadMap('overworld', { x: game.maps.overworld.spawn.x, y: game.maps.overworld.spawn.y });
-    game.notify(`Você acordou na cidade. Perdeu ${lost} de ouro.`, '#c96a6a');
+    game.notify(`Você acordou na cidade.${lost ? ` Perdeu ${lost} de ouro.` : ''}`, '#c96a6a');
   }
 
   // --- desenho -------------------------------------------------------------

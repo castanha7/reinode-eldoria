@@ -78,7 +78,7 @@ export const Input = {
 
 const BLOCKED = new Set([
   'Space', 'Tab', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
-  'KeyI', 'KeyQ', 'KeyE', 'KeyR', 'KeyH', 'KeyN', 'Digit1', 'Digit2', 'Digit3', 'Digit4', 'KeyM', 'Escape',
+  'KeyI', 'KeyQ', 'KeyE', 'KeyR', 'KeyH', 'KeyN', 'Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'KeyM', 'Escape',
 ]);
 
 function normalize(code) {

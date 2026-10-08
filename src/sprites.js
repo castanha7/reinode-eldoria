@@ -1429,6 +1429,15 @@ export function registerEffectSprites() {
       }
       c.globalAlpha = 1;
     });
+    defSoft(`fx:slashice:${f}`, 40, 40, (c) => {
+      const r0 = 10 + f * 3, r1 = 17 + f * 3;
+      const a0 = -0.9 + f * 0.22, a1 = 0.9 + f * 0.22;
+      c.globalAlpha = 1 - f * 0.24;
+      for (let a = a0; a < a1; a += 0.04) {
+        pxLine(c, 20 + Math.cos(a) * r0, 20 + Math.sin(a) * r0, 20 + Math.cos(a) * r1, 20 + Math.sin(a) * r1, f === 1 ? '#ffffff' : '#9ae8ff');
+      }
+      c.globalAlpha = 1;
+    });
   }
   // explosões
   for (let f = 0; f < 5; f++) {

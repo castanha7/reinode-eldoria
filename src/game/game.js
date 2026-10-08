@@ -15,7 +15,7 @@ import { sfx as playSfx } from '../core/audio.js';
 import { enemyDef, pickSpawn, REGION_SPAWNS } from '../data/enemies.js';
 import { QUESTS, questById, enemyTags, questUnlocked } from '../data/quests.js';
 import { MODES, modeById, MAX_LIVES, FINAL_QUEST } from '../data/modes.js';
-import { rollEquipment, consumable, shopStock, instantiate } from '../data/items.js';
+import { rollEquipment, rollMobDrop, pickEquipmentOfRarity, consumable, shopStock, instantiate } from '../data/items.js';
 import { drawHud, drawMinimap } from '../ui/hud.js';
 import { S } from '../sprites.js';
 import { clamp } from '../core/utils.js';
@@ -109,6 +109,11 @@ export class Game {
     this.won = false;
     this.killedStatics = new Set();
     this.openedChests = new Set();
+    // estado transitório limpo: nada de fade/barra de chefe/timer da run anterior
+    this.zoneFade = 0;
+    this.boss = null;
+    this.spawnTimer = 1;
+    this.frozenT = 0;
     // mapas novos: inimigos, baús e chefes recomeçam do zero a cada nova aventura
     this.buildMaps();
     this.player = new Player(classId);
@@ -298,7 +303,7 @@ export class Game {
     const mul = this.enemyMul();
     const hpMul = (opts.hpMul || 1) * mul.hp * (1 + Math.max(0, lvl - 4) * 0.07);
     const dmgMul = (opts.dmgMul || 1) * mul.dmg * (1 + Math.max(0, lvl - 4) * 0.045);
-    const e = new Enemy(type, x, y, { hpMul, dmgMul });
+    const e = new Enemy(type, x, y, { hpMul, dmgMul, summoned: !!opts.summoned });
     e.mapId = this.map.id;
     this.enemies.push(e);
     this.mapData[this.map.id].enemies.push(e);
@@ -329,9 +334,18 @@ export class Game {
 
   hitEnemy(e, rawDmg, opts = {}) {
     if (e.dead) return 0;
+    if (e.untargetable) {
+      // soterrado: intocável — feedback espaçado, sem spam
+      if (!e.dodgeFloatT || this.time > e.dodgeFloatT) {
+        e.dodgeFloatT = this.time + 0.7;
+        this.float(e.x, e.y - 20, 'embaixo da terra…', '#b09070', 6);
+      }
+      return 0;
+    }
     const crit = opts.crit !== undefined ? opts.crit : false;
     let dmg = rollDamage(rawDmg, e.defense, 1, 0.1);
     if (crit) dmg *= opts.critDmg || 1.8;
+    if (e.markT > 0) dmg *= 1 + e.markAmt; // Olho de Falcão
     dmg = Math.max(1, Math.round(dmg));
     this.float(e.x, e.y - e.radius * 2 - 8, String(dmg), crit ? '#ffe066' : '#ffffff', crit ? 9 : 7, { crit });
     this.particles.burst(e.x, e.y - 8, crit ? 12 : 7, {
@@ -386,7 +400,7 @@ export class Game {
     this.particles.burst(e.x, e.y - 8, 20, {
       color: [e.d.color, '#ffffff', shadeOf(e.d.color, -0.3)], speed: 110, life: 0.7,
     });
-    // drops
+    // drops fixos (consumíveis) — chance pequena, sempre a mesma lista
     for (const drop of e.d.drops || []) {
       if (Math.random() < drop.chance) {
         if (drop.id === 'phoenix_feather' && this.mode !== 'classic') continue;
@@ -394,10 +408,21 @@ export class Game {
         this.giveItem(it, null, `Saque: ${it.name}`);
       }
     }
+    // drop de EQUIPAMENTO por probabilidade (v2.1): qualquer mob pode soltar
+    // qualquer raridade — os pesos variam com a riqueza da área (tier). Nunca
+    // há garantia nem padrão fixo por tipo de inimigo.
+    if (!e.summoned) {
+      const mobDrop = rollMobDrop(Math.random, this.player.cls.id, e.d.tier || 1, 'mob');
+      if (mobDrop) this.giveItem(mobDrop, 'Drop aleatório');
+    }
     if (e.isElite || e.isBoss) {
       const tier = e.isBoss ? 4 : 3;
       const it = rollEquipment(Math.random, this.player.cls.id, tier);
       this.giveItem(it, e.isBoss ? 'Espólio do chefe' : 'Espólio de elite');
+      // elites e chefes sorteiam UM SEGUNDO item com tabelas próprias
+      // (chances muito melhores que as de um mob comum — inclusive lendário/mítico)
+      const extra = rollMobDrop(Math.random, this.player.cls.id, tier, e.isBoss ? 'boss' : 'elite');
+      if (extra) this.giveItem(extra, e.isBoss ? 'Tesouro do chefe' : 'Tesouro da elite');
       if (e.isBoss && this.mode === 'classic' && e.d.bossKind && Math.random() < 0.5) {
         this.giveItem(consumable('phoenix_feather'), null, 'O chefe deixou uma Pena da Fênix!');
       }
@@ -464,8 +489,13 @@ export class Game {
         return;
       }
     }
+    // a penalidade de ouro é aplicada AGORA (não no respawn): fechar o jogo no
+    // painel de morte não escapa dela — o save abaixo já reflete a perda
+    const lost = Math.round(p.gold * (this.mode === 'normal' ? 0.15 : 0.1));
+    p.gold = Math.max(0, p.gold - lost);
+    p.deathGoldLoss = lost;
     this.ui.showDeath();
-    if (this.mode !== 'normal') this.save();
+    this.save();
   }
 
   respawnPlayer() {
@@ -478,6 +508,8 @@ export class Game {
   /** Volta ao título (após fim de jogo). */
   toTitle() {
     this.state = 'title';
+    this.boss = null;
+    this.zoneFade = 0;
     this.ui.hideDeath();
     this.ui.closeAll();
     this.ui.buildTitle();
@@ -519,8 +551,7 @@ export class Game {
   giveItem(item, lootLabel, notifyText) {
     const p = this.player;
     if (p.addItem(item)) {
-      if (lootLabel && !item.kind) this.showLoot(item, lootLabel);
-      else if (lootLabel) this.showLoot(item, lootLabel);
+      if (lootLabel) this.showLoot(item, lootLabel);
       if (notifyText) this.notify(notifyText, '#9ae8ff');
       return true;
     }
@@ -557,6 +588,7 @@ export class Game {
     this.notify(`A Fênix renasce em você! Vidas: ${p.lives}`, '#ff8a3a');
     this.particles.burst(p.x, p.y - 12, 40, { color: ['#ff8a3a', '#ffd85a', '#ffffff'], speed: 140, life: 1 });
     this.addEffect({ sprite: 'fx:ring', frames: 5, x: p.x, y: p.y - 8, life: 0.7, scale: 2.4 });
+    this.save(); // a vida extra precisa sobreviver a um fechamento de aba
     return true;
   }
 
@@ -600,6 +632,7 @@ export class Game {
   // =========================================================================
   interact() {
     const p = this.player;
+    if (!p || p.dead) return; // caído: nada de baús, portais e diálogos
     // saída / portal
     for (const ex of this.map.exits) {
       if (Math.hypot(ex.x - p.x, ex.y - p.y) < ex.r + 10) {
@@ -660,7 +693,8 @@ export class Game {
     this.notify(`Recompensa: ${q.reward.gold} ouro, ${q.reward.xp} XP`, '#ffd85a');
     if (q.reward.item) {
       const tier = { rare: 2, epic: 3, legendary: 4 }[q.reward.item] || 1;
-      const it = rollEquipment(Math.random, p.cls.id, tier);
+      // a recompensa entrega a raridade PROMETIDA no diálogo (não um sorteio)
+      const it = pickEquipmentOfRarity(Math.random, p.cls.id, q.reward.item, tier);
       this.giveItem(it, 'Recompensa');
     }
     this.sfx('quest');
@@ -829,26 +863,30 @@ export class Game {
       const opened = [...this.openedChests];
       // inimigos fixos já derrotados (a lista persiste: o corpo some do mapa após a animação)
       const deadStatics = [...this.killedStatics];
+      // morto = o save sempre grava "ressuscitado na cidade" (nunca reanima no
+      // lugar da morte se o jogador fechar a aba antes do respawn)
+      const dead = this.player.dead;
+      const spawn = this.maps.overworld ? this.maps.overworld.spawn : { x: 0, y: 0 };
       const data = {
         v: SAVE_VERSION,
         mode: this.mode,
         won: this.won,
         lives: this.player.lives,
-        buffs: this.player.buffs,
+        buffs: dead ? [] : this.player.buffs,
         cls: this.player.cls.id,
         level: this.player.level,
         xp: this.player.xp,
         gold: this.player.gold,
-        hp: this.player.hp,
-        mana: this.player.mana,
+        hp: dead ? this.player.maxHp : this.player.hp,
+        mana: dead ? this.player.maxMana : this.player.mana,
         equip: this.player.equip,
         inventory: this.player.inventory,
         upgrades: this.player.weaponUpgrades,
         kills: this.player.kills,
         chestsOpened: this.player.chestsOpened,
         deaths: this.player.deaths,
-        map: this.map ? this.map.id : 'overworld',
-        pos: { x: this.player.x, y: this.player.y },
+        map: dead ? 'overworld' : (this.map ? this.map.id : 'overworld'),
+        pos: dead ? { x: spawn.x, y: spawn.y } : { x: this.player.x, y: this.player.y },
         quests: this.quests,
         opened,
         deadStatics,

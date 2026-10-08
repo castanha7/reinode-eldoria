@@ -156,6 +156,31 @@ export const BANDIT_SPEC = {
     px(c, 3, 14 + bob, 1, 5, '#dfe7f2'); px(c, 2, 18 + bob, 3, 1, '#8a6a3a');
   },
 };
+export const SHAMAN_SPEC = {
+  cloth: '#2a5a42', pants: '#1c3a2c', skin: '#c89a6a', hair: '#3a2a1a', boots: '#4a3a22',
+  trim: '#8aff8a', belt: '#c9a13c', eye: '#20162c',
+  decorate(c, S, fc, bob) {
+    const y = 5 + bob;
+    // touca com penas
+    px(c, 5, y - 2, 10, 4, '#3a6a4a');
+    px(c, 4, y - 4, 2, 4, '#e8d8a0'); px(c, 14, y - 4, 2, 4, '#e8d8a0');
+    px(c, 9, y - 5, 2, 4, '#ff8a5a');
+    if (fc === 0) { px(c, 6, y + 1, 8, 4, '#1c2a1c'); px(c, 7, y + 2, 2, 1, '#8aff8a'); px(c, 11, y + 2, 2, 1, '#8aff8a'); }
+    if (fc === 3) px(c, 5, y - 1, 10, 7, '#3a6a4a');
+    if (fc === 2) { px(c, 11, y + 1, 4, 4, '#1c2a1c'); px(c, 12, y + 2, 2, 1, '#8aff8a'); }
+    // colar de presas
+    px(c, 7, 15 + bob, 6, 1, '#f2ead2');
+    // sai de folhas
+    px(c, 5, 17 + bob, 10, 5, '#2a5a42');
+    for (let i = 0; i < 5; i++) px(c, 5 + i * 2, 21 + bob + (i % 2), 2, 2, i % 2 ? '#1c3a2c' : '#3a6a4a');
+    // cajado de osso com orbe de cura
+    px(c, 16, 6 + bob, 1, 18, '#8a6a3a');
+    disc(c, 16, 5 + bob, 2, '#8aff8a');
+    px(c, 15, 4 + bob, 1, 1, '#ffffff');
+    // tatuagens
+    if (fc === 0 || fc === 2) px(c, fc === 0 ? 8 : 12, 17 + bob, 1, 3, '#8aff8a');
+  },
+};
 export const CULTIST_SPEC = {
   cloth: '#4a1c6a', pants: '#2a1040', skin: '#8a7a9a', hair: null, boots: '#1a0c28',
   trim: '#b04ae0', belt: '#b04ae0', eye: '#ff4aff',
@@ -177,6 +202,226 @@ export const CULTIST_SPEC = {
     px(c, 16, 7 + bob, 1, 17, '#5a3a22'); disc(c, 16, 6 + bob, 2, '#ff4aff'); px(c, 15, 5 + bob, 1, 1, '#ffffff');
   },
 };
+
+// ===========================================================================
+// INIMIGOS NOVOS (v2.1) — desenhados para ler de relance: silhueta e cor
+// ===========================================================================
+function paintImp(c, f) {
+  // diabrete: pequeno, asas de morcego, sorriso maldoso; alterna pose por frame
+  const bob = [0, -1, 0, 1][f];
+  const skin = '#e05a3a', dark = '#8a2a1a', eye = '#ffe066';
+  // asas de morcego (triângulos desenhados em scanlines)
+  const flap = f % 2;
+  for (let i = 0; i < 4; i++) {
+    const wy = 8 + bob - flap * 2 + i;
+    px(c, 4 - i, wy, i + 1, 1, i > 2 ? dark : '#a83a22');
+    px(c, 15, wy, i + 1, 1, i > 2 ? dark : '#a83a22');
+  }
+  // corpo
+  disc(c, 10, 12 + bob, 4, skin);
+  px(c, 8, 15 + bob, 4, 4, skin);            // torso
+  px(c, 7, 19 + bob, 2, 2, dark); px(c, 11, 19 + bob, 2, 2, dark); // pés
+  // cabeça + chifres
+  disc(c, 10, 7 + bob, 3.5, skin);
+  px(c, 7, 3 + bob, 1, 2, dark); px(c, 12, 3 + bob, 1, 2, dark);
+  // cara
+  if (f !== 2) { px(c, 8, 7 + bob, 1, 1, eye); px(c, 11, 7 + bob, 1, 1, eye); }
+  px(c, 9, 9 + bob, 2, 1, '#40100a');
+  // cauda
+  pxLine(c, 12, 17 + bob, 16, 15 + bob - flap, dark);
+  // brasas nos pés quando corre
+  if (f === 1 || f === 3) px(c, 7 + f, 21, 1, 1, '#ff9a2a');
+}
+
+function paintPlagueRat(c, f) {
+  const bob = [0, 1, 0, 1][f];
+  const fur = '#7a8a4a', dark = '#4a5a2a', belly = '#a8b06a';
+  shadowOval(c, 9, 19, 7, 2);
+  ellipse(c, 9, 13 + bob, 6, 4, fur);        // corpo
+  ellipse(c, 9, 14 + bob, 4, 2, belly);
+  disc(c, 15, 12 + bob, 3, fur);             // cabeça
+  px(c, 16, 11 + bob, 1, 1, '#e8ff6a');      // olho doente
+  px(c, 14, 9 + bob, 2, 2, '#9a5a5a');       // orelha
+  px(c, 17, 13 + bob, 2, 1, '#e8b0b0');      // focinho
+  // bolhas de peste
+  px(c, 7, 10 + bob, 2, 2, '#b8e86a'); px(c, 11, 11 + bob, 1, 1, '#b8e86a');
+  // cauda
+  pxLine(c, 3, 13 + bob, 0, 15 + bob + (f % 2), dark);
+  // patas
+  px(c, 6, 17 + bob, 2, 1, dark); px(c, 12, 17 + bob, 2, 1, dark);
+}
+
+function paintBurrower(c, f) {
+  // veromba blindada: mandíbulas + dorso de rocha
+  const open = f === 1 || f === 3;
+  const hide = '#9a6a42', dark = '#5a3a22', rock = '#7a7268', tooth = '#f2ead2';
+  shadowOval(c, 10, 21, 8, 2);
+  ellipse(c, 10, 14, 8, 6, hide);            // corpo
+  // placas dorsais (pedra)
+  for (let i = 0; i < 4; i++) px(c, 4 + i * 4, 7 + (i % 2), 3, 3, rock);
+  // cabeça/mandíbula
+  disc(c, 16, 14, 4.5, hide);
+  if (open) {
+    px(c, 14, 10, 7, 2, dark); px(c, 14, 16, 7, 2, dark);
+    px(c, 15, 12, 1, 1, tooth); px(c, 18, 12, 1, 1, tooth);
+    px(c, 15, 15, 1, 1, tooth); px(c, 18, 15, 1, 1, tooth);
+  } else {
+    px(c, 14, 12, 7, 4, dark);
+    px(c, 15, 13, 1, 1, tooth); px(c, 18, 13, 1, 1, tooth);
+  }
+  px(c, 17, 11, 1, 1, '#ff8a6a');           // olho
+  // garras
+  px(c, 6, 18, 2, 2, dark); px(c, 13, 18, 2, 2, dark);
+  px(c, 5, 19, 1, 1, tooth); px(c, 12, 19, 1, 1, tooth);
+}
+
+function paintHarpy(c, f) {
+  const bob = [0, -1, -2, -1][f];           // bate asas
+  const skin = '#c8a0e8', feather = '#7a5ab0', dark = '#4a3270', eye = '#ffe066';
+  // asas grandes em penas (scanlines)
+  const flap = f === 1 ? -3 : f === 3 ? 2 : 0;
+  for (let i = 0; i < 6; i++) {
+    const wy = 6 + bob + flap + Math.floor(i * 0.9);
+    const wx = 6 - i;
+    px(c, wx - 1, wy, i > 3 ? 2 : 1, 2, i % 2 ? feather : dark);
+    px(c, 16 + (i > 3 ? 0 : 1), wy, i > 3 ? 2 : 1, 2, i % 2 ? feather : dark);
+  }
+  // corpo
+  ellipse(c, 11, 13 + bob, 4, 5, skin);
+  px(c, 8, 16 + bob, 6, 3, feather);         // penas inferiores
+  // cabeça + bico + mechas
+  disc(c, 11, 6 + bob, 3, skin);
+  px(c, 10, 8 + bob, 3, 1, '#ffb86a');      // bico
+  px(c, 8, 3 + bob, 6, 2, dark);            // cabelo/coroa de penas
+  px(c, 12, 2 + bob, 1, 2, '#e8d8ff');
+  if (f !== 2) { px(c, 9, 6 + bob, 1, 1, eye); px(c, 13, 6 + bob, 1, 1, eye); }
+  // garras
+  px(c, 9, 20 + bob, 1, 2, '#e8d8c0'); px(c, 11, 20 + bob, 1, 2, '#e8d8c0'); px(c, 13, 20 + bob, 1, 1, '#e8d8c0');
+}
+
+function paintSporeling(c, f) {
+  // bulbo verde com núcleo incandescente; incha no frame 3
+  const s = f === 3 ? 1.18 : 1;
+  const body = '#6aa842', lit = '#a0e04a', core = '#ffd85a';
+  c.save();
+  c.translate(9, 18);
+  c.scale(s, s);
+  c.translate(-9, -18);
+  ellipse(c, 9, 14, 6, 6, body);
+  ellipse(c, 9, 13, 4, 4, lit);
+  disc(c, 9, 13, f % 2 ? 2.5 : 2, core);    // núcleo pulsando
+  disc(c, 9, 13, 1, '#fff2c0');
+  px(c, 6, 6, 2, 3, '#3a6a2a'); px(c, 10, 5, 2, 4, '#3a6a2a'); // caule
+  px(c, 5, 17, 2, 1, '#3a6a2a'); px(c, 12, 17, 1, 2, '#3a6a2a'); // raízes
+  if (f === 3) { px(c, 4, 9, 1, 1, '#ff9a2a'); px(c, 13, 10, 1, 1, '#ff9a2a'); }
+  c.restore();
+}
+
+function paintStoneSentry(c, f) {
+  // monólito rúnico flutuante com anéis de pedra
+  const rock = '#9aa2b8', dark = '#5a6070', rune = '#7ad6ff';
+  const hum = f % 2;
+  shadowOval(c, 11, 25, 7, 2, 0.22);
+  // base flutuante (não toca o chão de fato)
+  pxLine(c, 6, 23, 16, 23, dark);
+  pxLine(c, 7, 22 - hum, 15, 22 - hum, dark);
+  // corpo
+  px(c, 7, 7, 8, 15, rock);
+  px(c, 8, 5, 6, 2, rock);
+  px(c, 7, 7, 1, 15, dark); // sombra lateral
+  // entalhes rúnicos brilhando
+  const on = f === 1 || f === 3;
+  px(c, 10, 9, 2, 2, on ? rune : dark);
+  px(c, 11, 13, 1, 3, on ? rune : dark);
+  px(c, 9, 17, 3, 1, on ? rune : dark);
+  // "olho"
+  px(c, 9, 6, 4, 2, '#12161f');
+  px(c, 10, 6 + (on ? 0 : 1), 2, 1, on ? '#7ad6ff' : dark);
+  // braços de pedra
+  px(c, 4, 10, 2, 5, rock); px(c, 16, 10, 2, 5, rock);
+  px(c, 3, 14, 3, 2, dark); px(c, 16, 14, 3, 2, dark);
+}
+
+// ---- chefes novos ----------------------------------------------------------
+function paintSkalla(c, f) {
+  // rainha do inverno: flutua, coroa de gelo, manto de nevasca
+  const bob = [0, -1, -2, -1][f];
+  const skin = '#d8e8f8', ice = '#9ae8ff', robe = '#2a4a7a', dark = '#16283f', glow = '#e8ffff';
+  shadowOval(c, 21, 49, 14, 3, 0.3);
+  // manto em A (triângulo largo desenhado em scanlines)
+  for (let i = 0; i < 32; i++) {
+    const half = Math.round(1 + i * 0.47);
+    px(c, 21 - half, 17 + bob + i, half * 2, 1, i > 26 ? dark : robe);
+  }
+  // dobra escura lateral
+  for (let i = 4; i < 31; i++) px(c, 21 - Math.round(i * 0.34), 20 + bob + i, 2, 1, dark);
+  // bainha de neve
+  for (let i = 0; i < 8; i++) px(c, 8 + i * 4, 46 - (i % 2), 3, 2, '#eef8ff');
+  // cauda de nevasca
+  c.globalAlpha = 0.6;
+  for (let i = 0; i < 4; i++) px(c, 5 + i, 42 + (f + i) % 3, 2, 2, glow);
+  px(c, 33 + (f % 2), 43, 2, 2, glow);
+  c.globalAlpha = 1;
+  // ombros de gelo
+  disc(c, 13, 17 + bob, 3.5, ice); disc(c, 29, 17 + bob, 3.5, ice);
+  disc(c, 13, 16 + bob, 2, glow); disc(c, 29, 16 + bob, 2, glow);
+  // braços cruzados segurando frio
+  px(c, 15, 22 + bob, 5, 3, skin); px(c, 22, 22 + bob, 5, 3, skin);
+  // cabeça
+  disc(c, 21, 9 + bob, 5.5, skin);
+  px(c, 16, 6 + bob, 10, 3, '#6a8ab0');      // cabelo congelado
+  px(c, 15, 9 + bob, 2, 6, '#6a8ab0'); px(c, 26, 9 + bob, 2, 6, '#6a8ab0');
+  // olhos brilhando
+  px(c, 19, 10 + bob, 1, 1, glow); px(c, 23, 10 + bob, 1, 1, glow);
+  px(c, 18, 9 + bob, 3, 1, ice); px(c, 22, 9 + bob, 3, 1, ice);
+  // coroa de estalactites
+  for (const [cx, h] of [[16, 5], [19, 7], [22, 8], [25, 6]]) {
+    pxLine(c, cx, 4 + bob, cx + 1, 4 - h + bob, ice);
+    px(c, cx, 4 - h + bob, 1, 1, glow);
+  }
+  // floco de gelo na mão
+  if (f === 1 || f === 3) { disc(c, 21, 26 + bob, 2, ice); px(c, 20, 26 + bob, 3, 1, glow); }
+}
+
+function paintAshkaru(c, f) {
+  // colosso de cinzas: magma rachando sob a pedra, macholão de brasa
+  const rock = '#4a4248', dark = '#28242a', lava = '#ff6a2a', hot = '#ffd85a';
+  const stomp = f === 1 ? 1 : 0;
+  shadowOval(c, 30, 59, 18, 3, 0.35);
+  // pernas
+  px(c, 18, 44, 8, 14 - stomp, rock); px(c, 36, 44, 8, 14, rock);
+  px(c, 17, 56 - stomp, 10, 3, dark); px(c, 35, 56, 10, 3, dark);
+  // torso largo
+  px(c, 14, 22, 34, 24, rock);
+  px(c, 14, 22, 34, 2, dark);
+  // rachaduras de magma no peito
+  pxLine(c, 22, 26, 26, 36, lava); pxLine(c, 34, 24, 30, 34, lava);
+  pxLine(c, 24, 27, 27, 34, hot);
+  px(c, 18, 38, 26, 2, lava);               // linha de brasa na cintura
+  px(c, 18, 38, 26, 1, hot);
+  // ombreiras
+  disc(c, 14, 23, 5, rock); disc(c, 48, 23, 5, rock);
+  px(c, 11, 20, 6, 2, lava); px(c, 45, 20, 6, 2, lava);
+  // braço direito: maça de rocha incandescente
+  px(c, 46, 28, 6, 12, rock);
+  disc(c, 52, 40 + stomp * 2, 6, dark);
+  px(c, 49, 37 + stomp * 2, 7, 2, lava); px(c, 50, 41 + stomp * 2, 5, 2, lava);
+  // cabeça encapuzada com olhos de brasa
+  px(c, 24, 10, 14, 13, dark);
+  px(c, 25, 9, 12, 3, rock);
+  px(c, 27, 15, 3, 2, lava); px(c, 33, 15, 3, 2, lava); // olhos
+  px(c, 27, 15, 3, 1, hot); px(c, 33, 15, 3, 1, hot);
+  // chifres
+  pxLine(c, 25, 9, 22, 4, rock); pxLine(c, 37, 9, 40, 4, rock);
+  // fumaça subindo
+  const sm = f % 4;
+  c.globalAlpha = 0.5;
+  px(c, 29 - sm, 6 - sm, 2, 2, '#9a92a0');
+  px(c, 33 + sm, 5 - sm, 1, 1, '#b8b0c0');
+  c.globalAlpha = 1;
+  // brasas caindo do torso
+  if (f === 2) { px(c, 20, 46, 1, 1, lava); px(c, 41, 50, 1, 1, hot); }
+}
 
 // ===========================================================================
 // CHEFES
@@ -486,6 +731,49 @@ const ICONS = {
     }
     px(c, 3, 19, 16, 1, '#3a1208');
   },
+  arcane_chain(c) {
+    iconBg(c, '#3a2a8a');
+    // raio em zigue-zague saltando entre 3 orbes
+    const pts = [[4, 16], [10, 8], [16, 13], [20, 5]];
+    for (let i = 0; i < pts.length - 1; i++) {
+      pxLine(c, pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1], '#b8a0ff');
+      pxLine(c, pts[i][0] + 1, pts[i][1], pts[i + 1][0] + 1, pts[i + 1][1] + 1, '#7ad6ff');
+    }
+    for (const [x, y] of pts) { disc(c, x, y, 2, '#e8dcff'); px(c, x, y, 1, 1, '#ffffff'); }
+  },
+  iron_vow(c) {
+    iconBg(c, '#5a6a86');
+    // escudo desenhado em scanlines + corrente luminosa
+    for (let i = 0; i < 12; i++) {
+      const half = 7 - Math.floor(i * i / 26);
+      if (half < 1) break;
+      px(c, 11 - half, 4 + i, half * 2, 1, i < 2 ? '#dfe7f2' : '#b8c6da');
+    }
+    for (let i = 0; i < 8; i++) {
+      const half = 5 - Math.floor(i * i / 20);
+      if (half < 1) break;
+      px(c, 11 - half, 6 + i, half * 2, 1, '#8a9ab4');
+    }
+    px(c, 10, 8, 2, 6, '#ffd85a'); px(c, 8, 10, 6, 2, '#ffd85a');
+    px(c, 10, 8, 2, 2, '#fff2c0');
+  },
+  eagle_mark(c) {
+    iconBg(c, '#7a5a1a');
+    // flecha grossa atravessando um alvo com asas
+    pxLine(c, 3, 18, 17, 5, '#fff2c0'); pxLine(c, 4, 18, 18, 5, '#e8b84a');
+    px(c, 16, 3, 4, 2, '#ffe066'); px(c, 19, 4, 2, 3, '#ffe066');
+    for (let a = 0; a < 6.28; a += 0.5) px(c, 8 + Math.cos(a) * 4, 11 + Math.sin(a) * 4, 1, 1, '#ff8a5a');
+    disc(c, 8, 11, 1.5, '#ff5a3a');
+  },
+  death_mark(c) {
+    iconBg(c, '#3a1030');
+    // adaga descendo sobre uma marca de execução
+    px(c, 6, 14, 10, 2, '#b02a3a'); px(c, 8, 17, 6, 1, '#7a1a2a');
+    pxLine(c, 11, 3, 11, 12, '#dfe7f2'); pxLine(c, 12, 3, 12, 12, '#9aa6b6');
+    px(c, 10, 3, 3, 1, '#ffffff');
+    px(c, 5, 8, 2, 1, '#e8e0ff'); px(c, 16, 6, 2, 1, '#e8e0ff');
+    c.globalAlpha = 0.8; px(c, 9, 20, 5, 1, '#b02a3a'); c.globalAlpha = 1;
+  },
   power_strike(c) {
     iconBg(c, '#5a6a82');
     pxLine(c, 4, 18, 17, 4, '#ffffff'); pxLine(c, 5, 18, 18, 4, '#dfe7f2'); pxLine(c, 3, 18, 16, 4, '#9aa6b6');
@@ -633,11 +921,21 @@ export function registerExtraSprites({ def, defSoft, paintHumanoid, FOUR_DIR_PAI
     def(`spider_queen:${f}`, 56, 46, (c) => paintSpiderQueen(c, f));
     def(`lich:${f}`, 42, 50, (c) => paintLich(c, f));
     def(`titan:${f}`, 60, 62, (c) => paintTitan(c, f));
+    // v2.1
+    def(`imp:${f}`, 20, 22, (c) => paintImp(c, f));
+    def(`plague_rat:${f}`, 20, 20, (c) => paintPlagueRat(c, f));
+    def(`burrower:${f}`, 22, 22, (c) => paintBurrower(c, f));
+    def(`harpy:${f}`, 22, 23, (c) => paintHarpy(c, f));
+    def(`sporeling:${f}`, 18, 21, (c) => paintSporeling(c, f));
+    def(`stonesentry:${f}`, 22, 26, (c) => paintStoneSentry(c, f));
+    def(`skalla:${f}`, 42, 51, (c) => paintSkalla(c, f));
+    def(`ashkaru:${f}`, 60, 60, (c) => paintAshkaru(c, f));
   }
   for (let d = 0; d < 4; d++) {
     for (let f = 0; f < 4; f++) {
       def(`bandit:${d}:${f}`, 20, 27, (c) => paintHumanoid(c, BANDIT_SPEC, d, f));
       def(`cultist:${d}:${f}`, 20, 27, (c) => paintHumanoid(c, CULTIST_SPEC, d, f));
+      def(`shaman:${d}:${f}`, 20, 27, (c) => paintHumanoid(c, SHAMAN_SPEC, d, f));
     }
   }
   // NPCs

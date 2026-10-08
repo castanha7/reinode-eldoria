@@ -11,7 +11,7 @@ export const NPC_DEFS = {
       'E, como se não bastasse, algo despertou sob a Caverna Esquecida, ao norte.',
       'Preciso de alguém que não deva nada a ninguém. Preciso de você.',
     ],
-    quests: ['q_slimes', 'q_forest', 'q_traitors', 'q_boss', 'q_spider', 'q_lich', 'q_titan'],
+    quests: ['q_slimes', 'q_forest', 'q_traitors', 'q_boss', 'q_spider', 'q_lich', 'q_titan', 'q_frost', 'q_ember'],
   },
   advisor: {
     sprite: 'elder', name: 'Conselheiro Otho', title: 'Conselheiro Real', role: 'talk',
