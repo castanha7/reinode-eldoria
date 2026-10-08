@@ -44,6 +44,18 @@ for (const k of ['WALL', 'TREE', 'PINE', 'ROCK', 'MOUNTAIN', 'FENCE', 'BUSH', 'C
   SOLID[TILE[k]] = 1;
 }
 
+/** Bloqueia o MOVIMENTO de corpos (sólidos + água). Projéteis voam sobre a água. */
+export const BLOCK = new Uint8Array(64);
+for (let i = 0; i < 64; i++) BLOCK[i] = SOLID[i];
+BLOCK[TILE.WATER] = 1;
+BLOCK[TILE.LILY] = 1;
+
+/** Multiplicador de velocidade ao pisar no tile. */
+export const SPEED_MUL = new Float32Array(64).fill(1);
+SPEED_MUL[TILE.SWAMP] = 0.72;
+SPEED_MUL[TILE.GRASS_TALL] = 0.94;
+SPEED_MUL[TILE.SAND] = 0.92;
+
 /** Bloqueia visão/linha de tiro. */
 export const OPAQUE = new Uint8Array(64);
 for (const k of ['WALL', 'TREE', 'PINE', 'ROCK', 'MOUNTAIN', 'CAVE_WALL', 'BUSH']) {
@@ -65,3 +77,4 @@ export const TILE_NAMES = {
 };
 
 export function isSolid(t) { return SOLID[t] === 1; }
+export function isBlocking(t) { return BLOCK[t] === 1; }

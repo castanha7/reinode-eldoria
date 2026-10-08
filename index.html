@@ -2,9 +2,12 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<meta name="theme-color" content="#14102a" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
 <title>Reino de Eldoria — RPG 2D Pixel Art</title>
-<meta name="description" content="RPG 2D top-down em pixel art: explore o reino de Eldoria, lute, evolua e enfrente o Guardião das Profundezas." />
+<meta name="description" content="RPG 2D top-down em pixel art: explore o reino de Eldoria, lute, evolua e enfrente o Guardião das Profundezas e três senhores das trevas. Modos Aventura, Clássico e Hardcore, com controles para celular." />
 <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -74,6 +77,7 @@
       <button class="btn" data-act="tab-inv">Inventário</button>
       <button class="btn" data-act="tab-quests">Missões</button>
       <button class="btn" data-act="tab-help">Ajuda</button>
+      <button class="btn" data-act="save-quit">Salvar e sair</button>
       <button class="btn danger" data-act="restart">Abandonar partida</button>
     </div>
   </div>
@@ -81,25 +85,44 @@
   <!-- morte -->
   <div id="death" class="overlay hidden">
     <div class="death-box">
-      <h2>Você caiu em batalha</h2>
+      <h2 id="death-title">Você caiu em batalha</h2>
+      <div id="death-lives"></div>
       <div id="death-stats"></div>
-      <button class="btn big" data-act="respawn">Acordar na cidade</button>
+      <div id="death-actions"><button class="btn big" data-act="respawn">Acordar na cidade</button></div>
     </div>
   </div>
+
+  <!-- vitória -->
+  <div id="victory" class="overlay hidden">
+    <div class="death-box victory-box">
+      <div class="crest"></div>
+      <h2>Eldoria está salva!</h2>
+      <div id="victory-body"></div>
+      <div class="title-actions">
+        <button class="btn big" data-act="victory-continue">Continuar explorando</button>
+        <button class="btn ghost" data-act="save-quit">Salvar e voltar ao título</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- controles de toque (criados por src/ui/touch.js) -->
+  <div id="touch" class="hidden"></div>
 
   <!-- título -->
   <div id="title" class="overlay">
     <div class="title-inner">
       <div class="crest"></div>
       <h1>REINO DE <span>ELDORIA</span></h1>
-      <p class="subtitle">Um RPG 2D em pixel art — escolha sua classe</p>
+      <p class="subtitle">Um RPG 2D em pixel art — escolha o modo e a classe</p>
+      <div id="mode-list"></div>
       <div id="class-list"></div>
       <div class="title-actions">
         <button id="btn-start" class="btn big disabled" data-act="start">Começar aventura</button>
         <button id="btn-continue" class="btn ghost hidden" data-act="continue">Continuar jogo salvo</button>
         <button id="btn-wipe" class="btn tiny ghost">Apagar progresso</button>
       </div>
-      <p class="hint">WASD move · Mouse mira e ataca · 1/2/3 habilidades · E interage · I inventário · Q missões</p>
+      <div id="trophies"></div>
+      <p class="hint" id="title-hint">WASD move · Mouse mira e ataca · 1-4 habilidades · Espaço esquiva · E interage · I inventário · Q missões</p>
     </div>
   </div>
 </div>

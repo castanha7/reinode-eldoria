@@ -9,6 +9,8 @@ export const Input = {
   clicks: [],
   enabled: true,
   anyKey: null,
+  /** Estado do controle por toque (preenchido por ui/touch.js). */
+  touch: { enabled: false, mx: 0, my: 0, fire: false, aim: null },
 
   init(canvas) {
     window.addEventListener('keydown', (e) => {
@@ -41,23 +43,7 @@ export const Input = {
       if (e.button === 2) this.mouse.right = false;
     });
     canvas.addEventListener('contextmenu', (e) => e.preventDefault());
-    // toque simples (mobile): toca = anda até o ponto
-    canvas.addEventListener('touchstart', (e) => {
-      const r = canvas.getBoundingClientRect();
-      const t = e.touches[0];
-      this.mouse.x = (t.clientX - r.left) * (canvas.width / r.width);
-      this.mouse.y = (t.clientY - r.top) * (canvas.height / r.height);
-      this.mouse.down = true;
-      e.preventDefault();
-    }, { passive: false });
-    canvas.addEventListener('touchmove', (e) => {
-      const r = canvas.getBoundingClientRect();
-      const t = e.touches[0];
-      this.mouse.x = (t.clientX - r.left) * (canvas.width / r.width);
-      this.mouse.y = (t.clientY - r.top) * (canvas.height / r.height);
-      e.preventDefault();
-    }, { passive: false });
-    canvas.addEventListener('touchend', () => { this.mouse.down = false; });
+    // o toque é tratado por ui/touch.js (joystick virtual + botões)
   },
 
   down(...codes) {
@@ -69,6 +55,20 @@ export const Input = {
     for (const c of codes) if (this.pressed[normalize(c)]) return true;
     return false;
   },
+  /** Eixo de movimento (-1..1): teclado + joystick virtual. */
+  axis() {
+    let x = 0, y = 0;
+    if (this.enabled) {
+      if (this.keys['KeyW'] || this.keys['ArrowUp']) y -= 1;
+      if (this.keys['KeyS'] || this.keys['ArrowDown']) y += 1;
+      if (this.keys['KeyA'] || this.keys['ArrowLeft']) x -= 1;
+      if (this.keys['KeyD'] || this.keys['ArrowRight']) x += 1;
+    }
+    if (x || y) { const l = Math.hypot(x, y); return { x: x / l, y: y / l }; }
+    return { x: this.touch.mx, y: this.touch.my };
+  },
+  /** Simula o toque numa tecla (botões da tela de toque). */
+  press(code) { this.pressed[code] = true; },
   endFrame() {
     this.pressed = Object.create(null);
     this.clicks.length = 0;
@@ -78,7 +78,7 @@ export const Input = {
 
 const BLOCKED = new Set([
   'Space', 'Tab', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
-  'KeyI', 'KeyQ', 'KeyE', 'Digit1', 'Digit2', 'Digit3', 'KeyM', 'Escape',
+  'KeyI', 'KeyQ', 'KeyE', 'KeyR', 'KeyH', 'KeyN', 'Digit1', 'Digit2', 'Digit3', 'Digit4', 'KeyM', 'Escape',
 ]);
 
 function normalize(code) {
